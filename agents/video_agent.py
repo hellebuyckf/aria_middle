@@ -57,13 +57,14 @@ def video_agent(state: ARIAState) -> ARIAState:
             )
 
         logger.info(f"[{session_id}] Étape 3/3 : calcul des métriques biomécaniques")
-        metrics = calculate_metrics(landmarks)
+        valid_landmarks = [pl.landmarks for pl in landmarks if pl is not None]
+        metrics = calculate_metrics(valid_landmarks, fps=25.0)
 
         logger.info(
             f"[{session_id}] video_agent terminé | "
             f"cadence={metrics.cadence_spm}spm "
             f"oscillation={metrics.oscillation_verticale_cm}cm "
-            f"frames_ok={metrics.nb_frames_analysees}/{len(frames)}"
+            f"cycles={metrics.nb_cycles_analyses}"
         )
 
         return {**state, "metrics": metrics, "statut": "rag"}

@@ -43,8 +43,12 @@ def test_video_agent_succes(
     mock_detect.return_value = _make_landmarks(10, 0)
     mock_calc.return_value = BiomechanicalMetrics(
         cadence_spm=172.0,
-        nb_frames_analysees=10,
-        nb_frames_echec=0,
+        angle_attaque_pied_deg=8.5,
+        flexion_genou_impact_deg=18.0,
+        inclinaison_tronc_deg=7.0,
+        oscillation_verticale_cm=6.5,
+        ratio_contact_suspension=0.60,
+        nb_cycles_analyses=10,
     )
 
     result = video_agent(_BASE_STATE)
@@ -79,7 +83,13 @@ def test_video_agent_taux_echec_sous_seuil(
 
     with patch("agents.video_agent.calculate_metrics") as mock_calc:
         mock_calc.return_value = BiomechanicalMetrics(
-            nb_frames_analysees=8, nb_frames_echec=2
+            cadence_spm=172.0,
+            angle_attaque_pied_deg=8.5,
+            flexion_genou_impact_deg=18.0,
+            inclinaison_tronc_deg=7.0,
+            oscillation_verticale_cm=6.5,
+            ratio_contact_suspension=0.60,
+            nb_cycles_analyses=8,
         )
         result = video_agent(_BASE_STATE)
 

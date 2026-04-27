@@ -212,3 +212,7 @@ reports/
 # Submodules (if tracked locally but should be excluded)
 # specs/ # (Note: normallement suivi, mais ignoré dans la version distante)
 
+data/video
+pose_landmarker_full.task
+*.mp4
+*.MTS
