@@ -1,5 +1,5 @@
 .PHONY: help fetch-corpus index-corpus build-corpus serve test test-video \
-        test-diagnosis test-rag lint format install download-model visualize clean
+        test-diagnosis test-rag test-report lint format install download-model visualize clean
 
 VIDEO  ?= data/sessions/test.mp4
 OUTPUT ?= output_pose.mp4
@@ -39,6 +39,9 @@ test-diagnosis: ## Tests du diagnosis_agent uniquement (sortie détaillée)
 
 test-rag: ## Tests du rag_agent uniquement (sortie détaillée)
 	uv run pytest tests/test_rag_agent.py -v -s
+
+test-report: ## Tests du report_agent uniquement (sortie détaillée)
+	uv run pytest tests/test_report_agent.py -v -s
 
 # ── Qualité ──────────────────────────────────────────────────────────────────
 lint: ## Lint + formatage automatique (ruff check & format)

@@ -1,28 +1,14 @@
-from dataclasses import dataclass, field
+from pydantic import BaseModel
 
 
-@dataclass
-class PubMedReference:
-    """Référence bibliographique issue de ChromaDB."""
-
-    pmid: str
-    titre: str
-    resume: str
-    score_similarite: float = 0.0
-
-
-@dataclass
-class RecommendationBlock:
-    """Bloc de recommandation structurée du rapport ARIA."""
-
-    categorie: str
-    texte: str
-
-
-@dataclass
-class ARIAReport:
-    """Rapport clinique généré par ARIA-ft."""
-
+class ARIAReport(BaseModel):
     session_id: str
-    contenu: str
-    recommandations: list[RecommendationBlock] = field(default_factory=list)
+    patient_id: str
+    pathologie: str
+    confiance: str
+    justification_diagnostic: str
+    metriques_anormales: list[str]
+    recommandations: list[str]
+    references_pubmed: list[str]
+    avertissement: str
+    date_generation: str
