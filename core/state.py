@@ -1,7 +1,15 @@
 from typing import Literal, TypedDict
 
+from models.diagnostic import DiagnosticLLM
 from models.metrics import BiomechanicalMetrics
-from models.report import ARIAReport, PubMedReference
+
+
+class PubMedReference(TypedDict):
+    """Référence bibliographique issue de ChromaDB / PubMed."""
+
+    pmid: str
+    titre: str
+    extrait: str
 
 
 class ARIAState(TypedDict):
@@ -10,9 +18,12 @@ class ARIAState(TypedDict):
     session_id: str
     patient_id: str
     video_path: str
+    video_path_posterior: str | None
+    pathologie_declaree: str | None
     metrics: BiomechanicalMetrics | None
+    diagnostic: DiagnosticLLM | None
     rag_refs: list[PubMedReference]
     prompt: str | None
-    report: ARIAReport | None
-    statut: Literal["idle", "video", "rag", "llm", "rapport", "erreur"]
+    report: str | None
+    statut: Literal["idle", "video", "diagnostic", "rag", "llm", "rapport", "erreur"]
     erreur: str | None

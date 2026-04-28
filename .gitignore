@@ -184,7 +184,6 @@ __pycache__/
 *.pyc
 .claude
 .DS_Store
-CLAUDE.md
 # S2 — SFT
 checkpoints/
 data/processed/sft_tokenized/
@@ -216,3 +215,4 @@ data/video
 pose_landmarker_full.task
 *.mp4
 *.MTS
+pose_landmarker_full.task
