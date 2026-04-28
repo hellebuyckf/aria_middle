@@ -5,6 +5,8 @@ import mediapipe as mp
 import numpy as np
 from loguru import logger
 
+from core.config import settings
+
 # Indices landmarks sagittaux utilisés pour la course (vue latérale gauche)
 SAGITTAL_INDICES: frozenset[int] = frozenset(
     {
@@ -40,38 +42,54 @@ class PoseLandmarks:
         return self.landmarks[index]
 
 
-def detect_pose(frames: list[np.ndarray]) -> list[PoseLandmarks | None]:
-    """Détecte les 33 keypoints BlazePose pour chaque frame.
-
-    Utilise le backend Metal (MPS) automatiquement sur Apple Silicon M3.
-    Retourne None pour les frames sans détection valide.
+def detect_pose(
+    frames: list[np.ndarray],
+    fps: float = 50.0,
+    model_path: str | None = None,
+) -> list[PoseLandmarks | None]:
+    """Détecte les 33 keypoints BlazePose pour chaque frame via Tasks API.
 
     Args:
         frames: Frames BGR issues de frame_extractor.
+        fps: Fréquence d'images (pour les timestamps vidéo).
+        model_path: Chemin vers le fichier .task ; utilise settings si None.
 
     Returns:
         Liste de PoseLandmarks ou None (une entrée par frame).
     """
-    mp_pose = mp.solutions.pose  # type: ignore[attr-defined]
+    resolved_model = model_path or settings.MEDIAPIPE_MODEL_PATH
+
+    BaseOptions = mp.tasks.BaseOptions  # type: ignore[attr-defined]
+    PoseLandmarker = mp.tasks.vision.PoseLandmarker  # type: ignore[attr-defined]
+    PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions  # type: ignore[attr-defined]
+    RunningMode = mp.tasks.vision.RunningMode  # type: ignore[attr-defined]
+
+    options = PoseLandmarkerOptions(
+        base_options=BaseOptions(model_asset_path=resolved_model),
+        running_mode=RunningMode.VIDEO,
+        min_pose_detection_confidence=0.7,
+        min_tracking_confidence=0.5,
+    )
+
     results: list[PoseLandmarks | None] = []
 
-    with mp_pose.Pose(
-        static_image_mode=False,
-        model_complexity=1,
-        min_detection_confidence=0.7,
-        min_tracking_confidence=0.5,
-    ) as pose:
+    with PoseLandmarker.create_from_options(options) as landmarker:
         for i, frame in enumerate(frames):
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            result = pose.process(frame_rgb)
+            ts_ms = int(i * 1000 / fps)
+            mp_img = mp.Image(
+                image_format=mp.ImageFormat.SRGB,
+                data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
+            )
+            result = landmarker.detect_for_video(mp_img, ts_ms)
 
-            if result.pose_landmarks is None:
+            if not result.pose_landmarks:
                 results.append(None)
                 continue
 
+            raw_lms = result.pose_landmarks[0]
             landmarks = [
                 Landmark(x=lm.x, y=lm.y, z=lm.z, visibility=lm.visibility)
-                for lm in result.pose_landmarks.landmark
+                for lm in raw_lms
             ]
             results.append(PoseLandmarks(frame_index=i, landmarks=landmarks))
 
