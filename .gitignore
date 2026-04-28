@@ -216,3 +216,6 @@ pose_landmarker_full.task
 *.mp4
 *.MTS
 pose_landmarker_full.task
+
+# Corpus PubMed — abstracts volumineux, régénérés via fetch_pubmed.py
+data/corpus/*.json
