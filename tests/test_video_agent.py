@@ -35,6 +35,14 @@ def session_state() -> ARIAState:
         video_path=_SAGITTALE_PATH,
         video_path_posterior=None,
         pathologie_declaree=None,
+        age=None,
+        taille_cm=None,
+        poids_kg=None,
+        km_semaine=None,
+        niveau_pratique=None,
+        profil_chaussure=None,
+        strava_charge=None,
+        garmin_charge=None,
         metrics=None,
         diagnostic=None,
         rag_refs=[],
@@ -50,11 +58,15 @@ def session_state() -> ARIAState:
 # ---------------------------------------------------------------------------
 
 
+@patch("agents.video_agent.os.path.exists", return_value=True)
 @patch("agents.video_agent.calculate_metrics")
 @patch("agents.video_agent.detect_pose")
 @patch("agents.video_agent.extract_frames")
 def test_video_agent_succes(
-    mock_extract: MagicMock, mock_detect: MagicMock, mock_calc: MagicMock
+    mock_extract: MagicMock,
+    mock_detect: MagicMock,
+    mock_calc: MagicMock,
+    _mock_exists: MagicMock,
 ) -> None:
     """Pipeline nominal : statut passe à 'rag' et metrics est renseigné."""
     mock_extract.return_value = _FAKE_FRAMES
@@ -74,6 +86,14 @@ def test_video_agent_succes(
         video_path="tests/fixtures/sample.mp4",
         video_path_posterior=None,
         pathologie_declaree=None,
+        age=None,
+        taille_cm=None,
+        poids_kg=None,
+        km_semaine=None,
+        niveau_pratique=None,
+        profil_chaussure=None,
+        strava_charge=None,
+        garmin_charge=None,
         metrics=None,
         diagnostic=None,
         rag_refs=[],
@@ -90,10 +110,11 @@ def test_video_agent_succes(
     assert result["erreur"] is None
 
 
+@patch("agents.video_agent.os.path.exists", return_value=True)
 @patch("agents.video_agent.detect_pose")
 @patch("agents.video_agent.extract_frames")
 def test_video_agent_taux_echec_depasse_seuil(
-    mock_extract: MagicMock, mock_detect: MagicMock
+    mock_extract: MagicMock, mock_detect: MagicMock, _mock_exists: MagicMock
 ) -> None:
     """Plus de 20% de frames sans détection → ARIAVideoError levée."""
     mock_extract.return_value = _FAKE_FRAMES
@@ -105,6 +126,14 @@ def test_video_agent_taux_echec_depasse_seuil(
         video_path="tests/fixtures/sample.mp4",
         video_path_posterior=None,
         pathologie_declaree=None,
+        age=None,
+        taille_cm=None,
+        poids_kg=None,
+        km_semaine=None,
+        niveau_pratique=None,
+        profil_chaussure=None,
+        strava_charge=None,
+        garmin_charge=None,
         metrics=None,
         diagnostic=None,
         rag_refs=[],
@@ -117,10 +146,11 @@ def test_video_agent_taux_echec_depasse_seuil(
         video_agent(state)
 
 
+@patch("agents.video_agent.os.path.exists", return_value=True)
 @patch("agents.video_agent.detect_pose")
 @patch("agents.video_agent.extract_frames")
 def test_video_agent_taux_echec_sous_seuil(
-    mock_extract: MagicMock, mock_detect: MagicMock
+    mock_extract: MagicMock, mock_detect: MagicMock, _mock_exists: MagicMock
 ) -> None:
     """Exactement 20% d'échec → ne lève pas ARIAVideoError (seuil strict >)."""
     mock_extract.return_value = _FAKE_FRAMES
@@ -132,6 +162,14 @@ def test_video_agent_taux_echec_sous_seuil(
         video_path="tests/fixtures/sample.mp4",
         video_path_posterior=None,
         pathologie_declaree=None,
+        age=None,
+        taille_cm=None,
+        poids_kg=None,
+        km_semaine=None,
+        niveau_pratique=None,
+        profil_chaussure=None,
+        strava_charge=None,
+        garmin_charge=None,
         metrics=None,
         diagnostic=None,
         rag_refs=[],
@@ -154,8 +192,11 @@ def test_video_agent_taux_echec_sous_seuil(
     assert result["statut"] == "rag"
 
 
+@patch("agents.video_agent.os.path.exists", return_value=True)
 @patch("agents.video_agent.extract_frames", side_effect=OSError("fichier introuvable"))
-def test_video_agent_erreur_extraction(mock_extract: MagicMock) -> None:
+def test_video_agent_erreur_extraction(
+    mock_extract: MagicMock, _mock_exists: MagicMock
+) -> None:
     """Exception générique → statut 'erreur', pas de levée d'exception."""
     assert mock_extract.side_effect is not None
 
@@ -165,6 +206,14 @@ def test_video_agent_erreur_extraction(mock_extract: MagicMock) -> None:
         video_path="tests/fixtures/sample.mp4",
         video_path_posterior=None,
         pathologie_declaree=None,
+        age=None,
+        taille_cm=None,
+        poids_kg=None,
+        km_semaine=None,
+        niveau_pratique=None,
+        profil_chaussure=None,
+        strava_charge=None,
+        garmin_charge=None,
         metrics=None,
         diagnostic=None,
         rag_refs=[],
@@ -177,6 +226,37 @@ def test_video_agent_erreur_extraction(mock_extract: MagicMock) -> None:
 
     assert result["statut"] == "erreur"
     assert result["erreur"] == "fichier introuvable"
+    assert result["metrics"] is None
+
+
+def test_video_agent_fichier_introuvable() -> None:
+    """video_path inexistant → statut 'erreur' immédiat, sans appeler extract_frames."""
+    state = ARIAState(
+        session_id="SES-TEST",
+        patient_id="PAT-001",
+        video_path="/inexistant/video.mp4",
+        video_path_posterior=None,
+        pathologie_declaree=None,
+        age=None,
+        taille_cm=None,
+        poids_kg=None,
+        km_semaine=None,
+        niveau_pratique=None,
+        profil_chaussure=None,
+        strava_charge=None,
+        garmin_charge=None,
+        metrics=None,
+        diagnostic=None,
+        rag_refs=[],
+        prompt=None,
+        report=None,
+        statut="idle",
+        erreur=None,
+    )
+    result = video_agent(state)
+
+    assert result["statut"] == "erreur"
+    assert result["erreur"] is not None and "introuvable" in result["erreur"]
     assert result["metrics"] is None
 
 

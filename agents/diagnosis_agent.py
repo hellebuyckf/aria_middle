@@ -17,7 +17,18 @@ async def diagnosis_agent(state: ARIAState) -> dict:
             "erreur": "diagnosis_agent: metrics est None, impossible de construire le prompt",
         }
 
-    prompt = build_diagnostic_prompt(metrics, state["pathologie_declaree"])
+    prompt = build_diagnostic_prompt(
+        metrics,
+        state["pathologie_declaree"],
+        age=state.get("age"),
+        taille_cm=state.get("taille_cm"),
+        poids_kg=state.get("poids_kg"),
+        niveau_pratique=state.get("niveau_pratique"),
+        km_semaine=state.get("km_semaine"),
+        profil_chaussure=state.get("profil_chaussure"),
+        strava_charge=state.get("strava_charge"),
+        garmin_charge=state.get("garmin_charge"),
+    )
 
     try:
         result: DiagnosticLLM = await generate_diagnostic(prompt)

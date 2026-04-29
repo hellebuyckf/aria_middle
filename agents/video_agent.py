@@ -1,3 +1,5 @@
+import os
+
 from loguru import logger
 
 from core.state import ARIAState
@@ -65,6 +67,14 @@ def video_agent(state: ARIAState) -> ARIAState:
     video_path_posterior = state.get("video_path_posterior")
 
     logger.info(f"[{session_id}] video_agent démarré | sagittale={video_path}")
+
+    if not os.path.exists(video_path):
+        return {
+            **state,
+            "metrics": None,
+            "statut": "erreur",
+            "erreur": f"Fichier vidéo introuvable : {video_path}",
+        }
 
     try:
         valid_sagittal = _run_pose_pipeline(video_path, session_id, "sagittale")

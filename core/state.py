@@ -12,6 +12,14 @@ class PubMedReference(TypedDict):
     extrait: str
 
 
+class ProfilChaussure(TypedDict, total=False):
+    marque: str
+    modele: str
+    drop_mm: int
+    stabilite: str
+    amorti: str
+
+
 class ARIAState(TypedDict):
     """État partagé entre tous les nœuds du graphe LangGraph ARIA."""
 
@@ -20,6 +28,16 @@ class ARIAState(TypedDict):
     video_path: str
     video_path_posterior: str | None
     pathologie_declaree: str | None
+    # Profil patient
+    age: int | None
+    taille_cm: int | None
+    poids_kg: float | None
+    km_semaine: int | None
+    niveau_pratique: str | None
+    profil_chaussure: ProfilChaussure | None
+    strava_charge: dict | None
+    garmin_charge: dict | None
+    # Pipeline
     metrics: BiomechanicalMetrics | None
     diagnostic: DiagnosticLLM | None
     rag_refs: list[PubMedReference]
