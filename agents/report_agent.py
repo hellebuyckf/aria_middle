@@ -1,3 +1,4 @@
+from core import events
 from core.state import ARIAState
 from models.metrics import BiomechanicalMetrics
 from models.report import ARIAReport
@@ -48,15 +49,51 @@ def _build_prompt(state: ARIAState) -> str:
 
 
 async def report_agent(state: ARIAState) -> dict:
+    session_id = state["session_id"]
     try:
-        prompt = _build_prompt(state)
-        raw_json: str = await llm.generate_report(
-            prompt=prompt,
-            session_id=state["session_id"],
-            patient_id=state["patient_id"],
-            response_format=ARIAReport.model_json_schema(),
+        await events.emit(
+            session_id,
+            {
+                "type": "progress",
+                "etape": "rapport",
+                "pct": 62,
+                "message": "Construction du prompt clinique...",
+            },
         )
+        prompt = _build_prompt(state)
+
+        await events.emit(
+            session_id,
+            {
+                "type": "progress",
+                "etape": "rapport",
+                "pct": 65,
+                "message": "Génération du rapport par ARIA-ft...",
+            },
+        )
+        ticker = events.tick(
+            session_id, "rapport", 65, 88, 18.0, "Génération du rapport..."
+        )
+        try:
+            raw_json: str = await llm.generate_report(
+                prompt=prompt,
+                session_id=session_id,
+                patient_id=state["patient_id"],
+                response_format=ARIAReport.model_json_schema(),
+            )
+        finally:
+            ticker.cancel()
+
         report = ARIAReport.model_validate_json(raw_json)
+        await events.emit(
+            session_id,
+            {
+                "type": "progress",
+                "etape": "rapport",
+                "pct": 90,
+                "message": "Rapport généré",
+            },
+        )
         return {"report": report, "statut": "rapport", "erreur": None}
     except Exception as exc:
         return {"report": None, "statut": "erreur", "erreur": str(exc)}
