@@ -8,13 +8,14 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile
 from fastapi.params import File, Form
 from loguru import logger
 
+from api.websocket import broadcast
+from core import events
 from core.config import settings
-from core.graph import run_pipeline
+from core.graph import run_analysis, run_report
 from core.state import ARIAState, ProfilChaussure
 
 router = APIRouter()
 
-# session_id → ARIAState courant (mis à jour en fin de pipeline)
 sessions_store: dict[str, ARIAState] = {}
 
 
@@ -24,19 +25,77 @@ async def _save_upload(upload: UploadFile, dest: Path) -> None:
     dest.write_bytes(content)
 
 
-async def _run_and_store(state: ARIAState) -> None:
+async def _run_analysis(state: ARIAState) -> None:
     session_id = state["session_id"]
+    events.register(session_id, lambda evt: broadcast(session_id, evt))
+    await broadcast(
+        session_id,
+        {"type": "progress", "etape": "video", "pct": 0, "message": "Analyse démarrée"},
+    )
     try:
-        result = await run_pipeline(state)
+        result = await run_analysis(state)
+        result = ARIAState(**{**result, "statut": "pret"})
         sessions_store[session_id] = result
-        logger.info("[{}] Pipeline terminé | statut={}", session_id, result["statut"])
+        logger.info("[{}] Phase 1 terminée | statut=pret", session_id)
+        await broadcast(
+            session_id,
+            {
+                "type": "ready",
+                "etape": "rag",
+                "pct": 100,
+                "session_id": session_id,
+                "diagnostic": result["diagnostic"].model_dump()
+                if result["diagnostic"]
+                else None,
+                "refs_count": len(result["rag_refs"]),
+            },
+        )
     except Exception as exc:
-        logger.error("[{}] Pipeline erreur inattendue : {}", session_id, exc)
-        sessions_store[session_id] = {
-            **state,
-            "statut": "erreur",
-            "erreur": str(exc),
-        }
+        logger.error("[{}] Analyse erreur inattendue : {}", session_id, exc)
+        sessions_store[session_id] = ARIAState(
+            **{**state, "statut": "erreur", "erreur": str(exc)}
+        )
+        await broadcast(
+            session_id, {"type": "error", "etape": "analyse", "message": str(exc)}
+        )
+    finally:
+        events.unregister(session_id)
+
+
+async def _run_report(session_id: str) -> None:
+    state = sessions_store[session_id]
+    events.register(session_id, lambda evt: broadcast(session_id, evt))
+    await broadcast(
+        session_id,
+        {
+            "type": "progress",
+            "etape": "rapport",
+            "pct": 60,
+            "message": "Génération du rapport...",
+        },
+    )
+    try:
+        result = await run_report(state)
+        sessions_store[session_id] = result
+        logger.info("[{}] Rapport généré | statut={}", session_id, result["statut"])
+        await broadcast(
+            session_id,
+            {
+                "type": "completed",
+                "etape": "rapport",
+                "rapport_url": f"/api/sessions/{session_id}/report",
+            },
+        )
+    except Exception as exc:
+        logger.error("[{}] Rapport erreur inattendue : {}", session_id, exc)
+        sessions_store[session_id] = ARIAState(
+            **{**state, "statut": "erreur", "erreur": str(exc)}
+        )
+        await broadcast(
+            session_id, {"type": "error", "etape": "rapport", "message": str(exc)}
+        )
+    finally:
+        events.unregister(session_id)
 
 
 def _parse_profil_chaussure(raw: str | None) -> ProfilChaussure | None:
@@ -102,12 +161,29 @@ async def create_session(
         erreur=None,
     )
     sessions_store[session_id] = state
-    background_tasks.add_task(_run_and_store, state)
+    background_tasks.add_task(_run_analysis, state)
 
     logger.info("[{}] Session créée | patient={}", session_id, patient_id)
     return {
         "session_id": session_id,
         "statut": "idle",
+        "ws_url": f"/ws/session/{session_id}",
+    }
+
+
+@router.post("/sessions/{session_id}/report")
+async def generate_report(session_id: str, background_tasks: BackgroundTasks) -> dict:
+    state = sessions_store.get(session_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Session introuvable")
+    if state["statut"] != "pret":
+        raise HTTPException(
+            status_code=409, detail=f"Session non prête (statut={state['statut']})"
+        )
+    background_tasks.add_task(_run_report, session_id)
+    return {
+        "session_id": session_id,
+        "statut": "llm",
         "ws_url": f"/ws/session/{session_id}",
     }
 
@@ -122,5 +198,7 @@ async def get_session(session_id: str) -> dict:
         "statut": state["statut"],
         "erreur": state["erreur"],
         "metrics": state["metrics"],
+        "diagnostic": state["diagnostic"].model_dump() if state["diagnostic"] else None,
+        "rag_refs": state["rag_refs"],
         "report": state["report"],
     }

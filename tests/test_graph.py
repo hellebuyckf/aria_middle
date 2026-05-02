@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from core.graph import run_pipeline
+from core.graph import run_analysis, run_report
 from core.state import ARIAState, PubMedReference
 from models.metrics import BiomechanicalMetrics
 from services.pose.mediapipe_service import Landmark, PoseLandmarks
@@ -73,19 +73,44 @@ _INITIAL_STATE = ARIAState(
     return_value=[_FAKE_POSE] * 10,
 )
 @patch("agents.video_agent.extract_frames", return_value=_FAKE_FRAMES)
+async def test_pipeline_analyse(
+    _mock_extract: MagicMock,
+    _mock_detect: MagicMock,
+    _mock_calc: MagicMock,
+    _mock_chroma: MagicMock,
+) -> None:
+    result = await run_analysis(_INITIAL_STATE)
+
+    assert result["statut"] == "pret"
+    assert result["metrics"] is not None
+    assert result["diagnostic"] is not None
+    assert isinstance(result["rag_refs"], list)
+    assert len(result["rag_refs"]) > 0
+    assert result["erreur"] is None
+
+
+@pytest.mark.skipif(
+    not os.path.exists("data/sessions/sagittale_test.mp4"),
+    reason="Vidéo de test absente — test ignoré",
+)
+@patch(
+    "agents.rag_agent.ChromaDBService",
+    return_value=AsyncMock(retrieve=AsyncMock(return_value=_FAKE_REFS)),
+)
+@patch("agents.video_agent.calculate_metrics", return_value=_FAKE_METRICS)
+@patch("agents.video_agent.detect_pose", return_value=[_FAKE_POSE] * 10)
+@patch("agents.video_agent.extract_frames", return_value=_FAKE_FRAMES)
 async def test_pipeline_complet(
     _mock_extract: MagicMock,
     _mock_detect: MagicMock,
     _mock_calc: MagicMock,
     _mock_chroma: MagicMock,
 ) -> None:
-    result = await run_pipeline(_INITIAL_STATE)
+    analyse = await run_analysis(_INITIAL_STATE)
+    assert analyse["statut"] == "pret"
 
+    result = await run_report(analyse)
     assert result["statut"] == "rapport"
-    assert result["metrics"] is not None
-    assert result["diagnostic"] is not None
-    assert isinstance(result["rag_refs"], list)
-    assert len(result["rag_refs"]) > 0
     assert result["report"] is not None
     assert result["erreur"] is None
 
@@ -113,7 +138,7 @@ async def test_pipeline_fichier_manquant() -> None:
         statut="idle",
         erreur=None,
     )
-    result = await run_pipeline(state)
+    result = await run_analysis(state)
 
     assert result["statut"] == "erreur"
     assert result["erreur"] is not None

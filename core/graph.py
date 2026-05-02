@@ -14,22 +14,36 @@ def _or_error(next_node: str):
     return _route
 
 
-_builder = StateGraph(ARIAState)
+# --- Phase 1 : vidéo → diagnostic → RAG ---
+_analysis_builder = StateGraph(ARIAState)
+_analysis_builder.add_node("video_agent", video_agent)
+_analysis_builder.add_node("diagnosis_agent", diagnosis_agent)
+_analysis_builder.add_node("rag_agent", rag_agent)
+_analysis_builder.add_edge(START, "video_agent")
+_analysis_builder.add_conditional_edges("video_agent", _or_error("diagnosis_agent"))
+_analysis_builder.add_conditional_edges("diagnosis_agent", _or_error("rag_agent"))
+_analysis_builder.add_conditional_edges("rag_agent", _or_error(END))
+_analysis_graph = _analysis_builder.compile()
 
-_builder.add_node("video_agent", video_agent)
-_builder.add_node("diagnosis_agent", diagnosis_agent)
-_builder.add_node("rag_agent", rag_agent)
-_builder.add_node("report_agent", report_agent)
-
-_builder.add_edge(START, "video_agent")
-_builder.add_conditional_edges("video_agent", _or_error("diagnosis_agent"))
-_builder.add_conditional_edges("diagnosis_agent", _or_error("rag_agent"))
-_builder.add_conditional_edges("rag_agent", _or_error("report_agent"))
-_builder.add_conditional_edges("report_agent", _or_error(END))
-
-aria_graph = _builder.compile()
+# --- Phase 2 : rapport LLM ---
+_report_builder = StateGraph(ARIAState)
+_report_builder.add_node("report_agent", report_agent)
+_report_builder.add_edge(START, "report_agent")
+_report_builder.add_conditional_edges("report_agent", _or_error(END))
+_report_graph = _report_builder.compile()
 
 
-async def run_pipeline(initial_state: ARIAState) -> ARIAState:
-    result = await aria_graph.ainvoke(initial_state)
-    return ARIAState(**result)
+async def _stream(graph, initial_state: ARIAState) -> ARIAState:
+    last_state: dict = dict(initial_state)
+    async for chunk in graph.astream(initial_state):
+        _, node_state = next(iter(chunk.items()))
+        last_state.update(node_state)
+    return ARIAState(**last_state)
+
+
+async def run_analysis(initial_state: ARIAState) -> ARIAState:
+    return await _stream(_analysis_graph, initial_state)
+
+
+async def run_report(state: ARIAState) -> ARIAState:
+    return await _stream(_report_graph, state)

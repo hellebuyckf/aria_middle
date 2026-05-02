@@ -43,5 +43,7 @@ class ARIAState(TypedDict):
     rag_refs: list[PubMedReference]
     prompt: str | None
     report: str | None
-    statut: Literal["idle", "video", "diagnostic", "rag", "llm", "rapport", "erreur"]
+    statut: Literal[
+        "idle", "video", "diagnostic", "rag", "pret", "llm", "rapport", "erreur"
+    ]
     erreur: str | None

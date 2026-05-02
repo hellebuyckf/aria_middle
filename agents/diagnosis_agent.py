@@ -1,5 +1,6 @@
 import asyncio
 
+from core import events
 from core.state import ARIAState
 from models.diagnostic import DiagnosticLLM
 from services.llm.prompt_builder import build_diagnostic_prompt
@@ -9,6 +10,17 @@ from services.llm.vllm_client_mock import generate_diagnostic
 
 
 async def diagnosis_agent(state: ARIAState) -> dict:
+    session_id = state["session_id"]
+    await events.emit(
+        session_id,
+        {
+            "type": "progress",
+            "etape": "diagnostic",
+            "pct": 43,
+            "message": "Analyse diagnostique...",
+        },
+    )
+
     metrics = state["metrics"]
     if metrics is None:
         return {
@@ -45,6 +57,15 @@ async def diagnosis_agent(state: ARIAState) -> dict:
             "erreur": f"diagnosis_agent: {exc}",
         }
 
+    await events.emit(
+        session_id,
+        {
+            "type": "progress",
+            "etape": "diagnostic",
+            "pct": 50,
+            "message": "Diagnostic établi",
+        },
+    )
     return {
         "diagnostic": result,
         "statut": "diagnostic",
