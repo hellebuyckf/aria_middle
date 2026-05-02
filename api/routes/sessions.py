@@ -174,7 +174,7 @@ async def create_session(
     }
 
 
-@router.post("/sessions/{session_id}/report")
+@router.post("/sessions/{session_id}/generate")
 async def generate_report(session_id: str, background_tasks: BackgroundTasks) -> dict:
     state = sessions_store.get(session_id)
     if state is None:
