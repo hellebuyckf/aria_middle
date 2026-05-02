@@ -1,4 +1,4 @@
-from core import events
+import core.events as events
 from core.state import ARIAState
 from models.metrics import BiomechanicalMetrics
 from models.report import ARIAReport
