@@ -2,6 +2,7 @@ from typing import Literal, TypedDict
 
 from models.diagnostic import DiagnosticLLM
 from models.metrics import BiomechanicalMetrics
+from models.report import ARIAReport
 
 
 class PubMedReference(TypedDict):
@@ -42,7 +43,7 @@ class ARIAState(TypedDict):
     diagnostic: DiagnosticLLM | None
     rag_refs: list[PubMedReference]
     prompt: str | None
-    report: str | None
+    report: ARIAReport | None
     statut: Literal[
         "idle", "video", "diagnostic", "rag", "pret", "llm", "rapport", "erreur"
     ]

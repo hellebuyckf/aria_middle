@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 16mm 22mm 16mm;
+    @bottom-center {
+      content: "ARIA — Rapport confidentiel — " string(patient) " — Page " counter(page) " / " counter(pages);
+      font-size: 8pt;
+      color: #888;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 9.5pt; color: #1a1a1a; line-height: 1.45; }
+
+  /* ── Header ── */
+  .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2.5px solid #1b4fac; padding-bottom: 8px; margin-bottom: 14px; }
+  .header-title { font-size: 18pt; font-weight: 700; color: #1b4fac; letter-spacing: -0.5px; }
+  .header-subtitle { font-size: 9pt; color: #555; margin-top: 2px; }
+  .header-meta { text-align: right; font-size: 8pt; color: #666; }
+  .header-meta strong { color: #1a1a1a; }
+
+  /* ── Section titles ── */
+  h2 { font-size: 10.5pt; font-weight: 700; color: #1b4fac; border-left: 3px solid #1b4fac; padding-left: 7px; margin: 14px 0 7px; text-transform: uppercase; letter-spacing: 0.4px; }
+
+  /* ── Diagnostic card ── */
+  .diag-card { background: #f4f7fd; border: 1px solid #c8d8f5; border-radius: 5px; padding: 11px 14px; display: flex; gap: 14px; align-items: flex-start; }
+  .diag-main { flex: 1; }
+  .diag-patho { font-size: 13pt; font-weight: 700; color: #1a1a1a; }
+  .diag-justif { margin-top: 5px; font-size: 9pt; color: #333; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 8pt; font-weight: 700; white-space: nowrap; }
+  .badge-elevee  { background: #fde8e8; color: #b91c1c; border: 1px solid #fca5a5; }
+  .badge-moderee { background: #fff3cd; color: #92400e; border: 1px solid #fcd34d; }
+  .badge-faible  { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+
+  /* ── Metrics table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+  thead th { background: #1b4fac; color: #fff; padding: 5px 8px; text-align: left; font-size: 8.5pt; font-weight: 600; }
+  tbody tr:nth-child(even) { background: #f8faff; }
+  tbody td { padding: 4px 8px; border-bottom: 1px solid #e8eef8; }
+  .abnormal td { color: #b91c1c; font-weight: 600; }
+  .abnormal td:first-child::before { content: "⚠ "; }
+  .val-col { font-variant-numeric: tabular-nums; text-align: right; width: 90px; }
+  .norm-col { color: #555; text-align: right; width: 90px; }
+
+  /* ── Lists ── */
+  .reco-list, .ref-list { padding-left: 0; list-style: none; }
+  .reco-list li { padding: 4px 0 4px 16px; border-bottom: 1px solid #eee; position: relative; font-size: 9pt; }
+  .reco-list li::before { content: "→"; position: absolute; left: 0; color: #1b4fac; font-weight: 700; }
+  .ref-list li { padding: 3px 0; font-size: 8.5pt; color: #444; }
+  .ref-list li::before { content: "• "; color: #1b4fac; }
+
+  /* ── Warning ── */
+  .warning { margin-top: 20px; border: 1px solid #d1d5db; border-radius: 4px; padding: 8px 12px; font-size: 8pt; color: #666; background: #f9fafb; }
+  .warning strong { color: #374151; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div>
+    <div class="header-title">ARIA</div>
+    <div class="header-subtitle">Rapport d'Analyse Biomécanique de la Course</div>
+  </div>
+  <div class="header-meta">
+    <div><strong>Session</strong> {{ report.session_id }}</div>
+    <div><strong>Patient</strong> <span style="string-set: patient content()">{{ report.patient_id }}</span>{{ report.patient_id }}</div>
+    <div><strong>Date</strong> {{ report.date_generation }}</div>
+  </div>
+</div>
+
+<!-- DIAGNOSTIC -->
+<h2>Diagnostic principal</h2>
+<div class="diag-card">
+  <div class="diag-main">
+    <div class="diag-patho">{{ report.pathologie }}</div>
+    <div class="diag-justif">{{ report.justification_diagnostic }}</div>
+  </div>
+  <div>
+    {% if report.confiance == "élevée" %}
+      <span class="badge badge-elevee">Confiance élevée</span>
+    {% elif report.confiance == "modérée" %}
+      <span class="badge badge-moderee">Confiance modérée</span>
+    {% else %}
+      <span class="badge badge-faible">Confiance faible</span>
+    {% endif %}
+  </div>
+</div>
+
+<!-- MÉTRIQUES SAGITTALES -->
+{% if rows_sag %}
+<h2>Métriques biomécaniques — Vue sagittale</h2>
+<table>
+  <thead><tr><th>Métrique</th><th class="val-col">Valeur</th><th class="norm-col">Norme</th></tr></thead>
+  <tbody>
+    {% for row in rows_sag %}
+    <tr{% if row.abnormal %} class="abnormal"{% endif %}>
+      <td>{{ row.label }}</td>
+      <td class="val-col">{{ row.value }}</td>
+      <td class="norm-col">{{ row.norm }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<!-- MÉTRIQUES POSTÉRIEURES -->
+{% if rows_post %}
+<h2>Métriques biomécaniques — Vue postérieure</h2>
+<table>
+  <thead><tr><th>Métrique</th><th class="val-col">Valeur</th><th class="norm-col">Norme</th></tr></thead>
+  <tbody>
+    {% for row in rows_post %}
+    <tr{% if row.abnormal %} class="abnormal"{% endif %}>
+      <td>{{ row.label }}</td>
+      <td class="val-col">{{ row.value }}</td>
+      <td class="norm-col">{{ row.norm }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<!-- RECOMMANDATIONS -->
+{% if report.recommandations %}
+<h2>Recommandations</h2>
+<ul class="reco-list">
+  {% for r in report.recommandations %}
+  <li>{{ r }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<!-- RÉFÉRENCES -->
+{% if report.references_pubmed %}
+<h2>Références bibliographiques</h2>
+<ul class="ref-list">
+  {% for ref in report.references_pubmed %}
+  <li>{{ ref }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<!-- AVERTISSEMENT -->
+<div class="warning">
+  <strong>Avertissement médical.</strong> {{ report.avertissement }}
+</div>
+
+</body>
+</html>

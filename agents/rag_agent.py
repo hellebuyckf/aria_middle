@@ -1,4 +1,4 @@
-from core import events
+import core.events as events
 from core.state import ARIAState
 from services.rag.chromadb_service import ChromaDBService
 

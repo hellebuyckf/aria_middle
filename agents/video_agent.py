@@ -5,7 +5,7 @@ from functools import partial
 
 from loguru import logger
 
-from core import events
+import core.events as events
 from core.state import ARIAState
 from services.pose.frame_extractor import extract_frames
 from services.pose.mediapipe_service import detect_pose

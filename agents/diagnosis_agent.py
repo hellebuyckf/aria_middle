@@ -1,6 +1,6 @@
 import asyncio
 
-from core import events
+import core.events as events
 from core.state import ARIAState
 from models.diagnostic import DiagnosticLLM
 from services.llm.prompt_builder import build_diagnostic_prompt

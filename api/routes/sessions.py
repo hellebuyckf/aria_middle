@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 from datetime import date
@@ -6,13 +7,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile
 from fastapi.params import File, Form
+from fastapi.responses import Response
 from loguru import logger
 
 from api.websocket import broadcast
-from core import events
+import core.events as events
 from core.config import settings
 from core.graph import run_analysis, run_report
 from core.state import ARIAState, ProfilChaussure
+from services.pdf.pdf_service import render_pdf
 
 router = APIRouter()
 
@@ -186,6 +189,26 @@ async def generate_report(session_id: str, background_tasks: BackgroundTasks) ->
         "statut": "llm",
         "ws_url": f"/ws/session/{session_id}",
     }
+
+
+@router.get("/sessions/{session_id}/report")
+async def download_report(session_id: str) -> Response:
+    state = sessions_store.get(session_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="Session introuvable")
+    if state["statut"] != "rapport" or state["report"] is None:
+        raise HTTPException(
+            status_code=409, detail=f"Rapport non disponible (statut={state['statut']})"
+        )
+    loop = asyncio.get_running_loop()
+    pdf_bytes = await loop.run_in_executor(None, render_pdf, state)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="aria_{session_id}.pdf"'
+        },
+    )
 
 
 @router.get("/sessions/{session_id}")
