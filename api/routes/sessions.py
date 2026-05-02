@@ -173,9 +173,7 @@ async def download_report(session_id: str) -> Response:
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'attachment; filename="aria_{session_id}.pdf"'
-        },
+        headers={"Content-Disposition": f'inline; filename="aria_{session_id}.pdf"'},
     )
 
 
