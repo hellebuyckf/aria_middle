@@ -28,7 +28,8 @@ async def _save_upload(upload: UploadFile, dest: Path) -> None:
     dest.write_bytes(content)
 
 
-async def _run_analysis(state: ARIAState) -> None:
+async def _run_pipeline(state: ARIAState) -> None:
+    """Lance le pipeline complet : analyse vidéo → diagnostic → RAG → rapport."""
     session_id = state["session_id"]
     events.register(session_id, lambda evt: broadcast(session_id, evt))
     await broadcast(
@@ -36,49 +37,13 @@ async def _run_analysis(state: ARIAState) -> None:
         {"type": "progress", "etape": "video", "pct": 0, "message": "Analyse démarrée"},
     )
     try:
-        result = await run_analysis(state)
-        result = ARIAState(**{**result, "statut": "pret"})
-        sessions_store[session_id] = result
-        logger.info("[{}] Phase 1 terminée | statut=pret", session_id)
-        await broadcast(
-            session_id,
-            {
-                "type": "ready",
-                "etape": "rag",
-                "pct": 100,
-                "session_id": session_id,
-                "diagnostic": result["diagnostic"].model_dump()
-                if result["diagnostic"]
-                else None,
-                "refs_count": len(result["rag_refs"]),
-            },
-        )
-    except Exception as exc:
-        logger.error("[{}] Analyse erreur inattendue : {}", session_id, exc)
-        sessions_store[session_id] = ARIAState(
-            **{**state, "statut": "erreur", "erreur": str(exc)}
-        )
-        await broadcast(
-            session_id, {"type": "error", "etape": "analyse", "message": str(exc)}
-        )
-    finally:
-        events.unregister(session_id)
+        # Phase 1 : vidéo → diagnostic → RAG
+        analysis = await run_analysis(state)
+        sessions_store[session_id] = ARIAState(**{**analysis, "statut": "pret"})
+        logger.info("[{}] Analyse terminée", session_id)
 
-
-async def _run_report(session_id: str) -> None:
-    state = sessions_store[session_id]
-    events.register(session_id, lambda evt: broadcast(session_id, evt))
-    await broadcast(
-        session_id,
-        {
-            "type": "progress",
-            "etape": "rapport",
-            "pct": 60,
-            "message": "Génération du rapport...",
-        },
-    )
-    try:
-        result = await run_report(state)
+        # Phase 2 : rapport LLM (automatique, pas d'action frontend requise)
+        result = await run_report(sessions_store[session_id])
         sessions_store[session_id] = result
         logger.info("[{}] Rapport généré | statut={}", session_id, result["statut"])
         await broadcast(
@@ -90,12 +55,12 @@ async def _run_report(session_id: str) -> None:
             },
         )
     except Exception as exc:
-        logger.error("[{}] Rapport erreur inattendue : {}", session_id, exc)
+        logger.error("[{}] Pipeline erreur inattendue : {}", session_id, exc)
         sessions_store[session_id] = ARIAState(
             **{**state, "statut": "erreur", "erreur": str(exc)}
         )
         await broadcast(
-            session_id, {"type": "error", "etape": "rapport", "message": str(exc)}
+            session_id, {"type": "error", "etape": "pipeline", "message": str(exc)}
         )
     finally:
         events.unregister(session_id)
@@ -164,7 +129,7 @@ async def create_session(
         erreur=None,
     )
     sessions_store[session_id] = state
-    background_tasks.add_task(_run_analysis, state)
+    background_tasks.add_task(_run_pipeline, state)
 
     logger.info("[{}] Session créée | patient={}", session_id, patient_id)
     return {
@@ -175,25 +140,22 @@ async def create_session(
 
 
 @router.post("/sessions/{session_id}/generate")
-async def generate_report(session_id: str) -> dict:
+async def get_report_data(session_id: str) -> dict:
+    """Retourne les données du rapport (déjà généré par le pipeline automatique)."""
     state = sessions_store.get(session_id)
     if state is None:
         raise HTTPException(status_code=404, detail="Session introuvable")
-    if state["statut"] not in ("pret", "rapport"):
+    if state["statut"] == "erreur":
+        raise HTTPException(status_code=500, detail=state["erreur"])
+    if state["statut"] != "rapport" or state["report"] is None:
         raise HTTPException(
-            status_code=409, detail=f"Session non prête (statut={state['statut']})"
+            status_code=409, detail=f"Rapport non disponible (statut={state['statut']})"
         )
-    if state["statut"] != "rapport":
-        await _run_report(session_id)
-
-    final = sessions_store[session_id]
-    if final["statut"] == "erreur":
-        raise HTTPException(status_code=500, detail=final["erreur"])
     return {
         "session_id": session_id,
         "statut": "rapport",
         "rapport_url": f"/api/sessions/{session_id}/report",
-        "report": final["report"].model_dump() if final["report"] else None,
+        "report": state["report"].model_dump(),
     }
 
 
