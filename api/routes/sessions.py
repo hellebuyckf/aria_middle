@@ -175,19 +175,25 @@ async def create_session(
 
 
 @router.post("/sessions/{session_id}/generate")
-async def generate_report(session_id: str, background_tasks: BackgroundTasks) -> dict:
+async def generate_report(session_id: str) -> dict:
     state = sessions_store.get(session_id)
     if state is None:
         raise HTTPException(status_code=404, detail="Session introuvable")
-    if state["statut"] != "pret":
+    if state["statut"] not in ("pret", "rapport"):
         raise HTTPException(
             status_code=409, detail=f"Session non prête (statut={state['statut']})"
         )
-    background_tasks.add_task(_run_report, session_id)
+    if state["statut"] != "rapport":
+        await _run_report(session_id)
+
+    final = sessions_store[session_id]
+    if final["statut"] == "erreur":
+        raise HTTPException(status_code=500, detail=final["erreur"])
     return {
         "session_id": session_id,
-        "statut": "llm",
-        "ws_url": f"/ws/session/{session_id}",
+        "statut": "rapport",
+        "rapport_url": f"/api/sessions/{session_id}/report",
+        "report": final["report"].model_dump() if final["report"] else None,
     }
 
 
