@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import jinja2
-import weasyprint  # type: ignore[import-untyped]
 
 from core.state import ARIAState
 from models.metrics import BiomechanicalMetrics
@@ -94,6 +93,8 @@ def render_pdf(state: ARIAState) -> bytes:
         rows_sag=rows_sag,
         rows_post=rows_post,
     )
+    import weasyprint  # type: ignore[import-untyped]  # lazy : évite crash au démarrage si DYLD_LIBRARY_PATH absent
+
     result = weasyprint.HTML(string=html).write_pdf()
     if result is None:
         raise RuntimeError("WeasyPrint n'a pas pu générer le PDF")
