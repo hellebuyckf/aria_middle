@@ -1,16 +1,6 @@
 import logging
-import os
 import sys
 from contextlib import asynccontextmanager
-
-# Sur macOS, WeasyPrint (cffi/pango) nécessite que les libs Homebrew soient accessibles
-# via DYLD_LIBRARY_PATH. Ce bloc injecte le path et re-exec le process si nécessaire.
-if sys.platform == "darwin":
-    _BREW_LIB = "/opt/homebrew/lib"
-    _dyld = os.environ.get("DYLD_LIBRARY_PATH", "")
-    if _BREW_LIB not in _dyld:
-        os.environ["DYLD_LIBRARY_PATH"] = f"{_BREW_LIB}:{_dyld}".rstrip(":")
-        os.execv(sys.executable, [sys.executable] + sys.argv)
 from typing import AsyncIterator
 
 import chromadb
