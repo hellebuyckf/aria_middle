@@ -1,3 +1,6 @@
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import jinja2
@@ -27,6 +30,9 @@ _METRICS_POSTERIOR: list[tuple[str, str, str, str]] = [
     ("oscillation_laterale_hanche", "Oscillation latérale hanche", "cm", "< 3"),
     ("pronation_pied", "Pronation pied", "°", "< 8"),
 ]
+
+# Sur macOS (Apple Silicon), WeasyPrint/cffi ne trouve pas libgobject via dlopen sans ce path.
+_MACOS_BREW_LIB = "/opt/homebrew/lib"
 
 
 def _fmt(value: float | None, unit: str) -> str:
@@ -59,7 +65,7 @@ def _is_abnormal(field: str, value: float | None) -> bool:
     return False
 
 
-def render_pdf(state: ARIAState) -> bytes:
+def _build_html(state: ARIAState) -> str:
     report: ARIAReport = state["report"]  # type: ignore[assignment]
     metrics: BiomechanicalMetrics | None = state["metrics"]
 
@@ -88,14 +94,35 @@ def render_pdf(state: ARIAState) -> bytes:
                     }
                 )
 
-    html = _env.get_template("report_template.html").render(
+    return _env.get_template("report_template.html").render(
         report=report,
         rows_sag=rows_sag,
         rows_post=rows_post,
     )
-    import weasyprint  # type: ignore[import-untyped]  # lazy : évite crash au démarrage si DYLD_LIBRARY_PATH absent
 
-    result = weasyprint.HTML(string=html).write_pdf()
-    if result is None:
-        raise RuntimeError("WeasyPrint n'a pas pu générer le PDF")
-    return result
+
+def render_pdf(state: ARIAState) -> bytes:
+    html = _build_html(state)
+
+    # WeasyPrint est lancé dans un subprocess avec DYLD_LIBRARY_PATH injecté
+    # pour que cffi/pango trouvent les libs Homebrew sur macOS Apple Silicon.
+    env = dict(os.environ)
+    if sys.platform == "darwin" and _MACOS_BREW_LIB not in env.get(
+        "DYLD_LIBRARY_PATH", ""
+    ):
+        env["DYLD_LIBRARY_PATH"] = (
+            _MACOS_BREW_LIB + ":" + env.get("DYLD_LIBRARY_PATH", "")
+        )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys, weasyprint; weasyprint.HTML(string=sys.stdin.read()).write_pdf(sys.stdout.buffer)",
+        ],
+        input=html.encode(),
+        capture_output=True,
+        env=env,
+        check=True,
+    )
+    return result.stdout
