@@ -2,21 +2,53 @@ import cv2
 import numpy as np
 from loguru import logger
 
+# Cascades Haar OpenCV — disponibles sans modèle externe (bundlées dans cv2)
+# frontal : coureur face caméra ; profil : vue sagittale (cas le plus fréquent)
+_FRONTAL: cv2.CascadeClassifier = cv2.CascadeClassifier(
+    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"  # type: ignore[attr-defined]
+)
+_PROFILE: cv2.CascadeClassifier = cv2.CascadeClassifier(
+    cv2.data.haarcascades + "haarcascade_profileface.xml"  # type: ignore[attr-defined]
+)
+
+
+def _blur_faces(frame: np.ndarray) -> np.ndarray:
+    """Floute tous les visages détectés dans une frame (RGPD).
+
+    Teste les cascades frontale et profil pour couvrir la vue sagittale.
+    Kernel proportionnel à la largeur du visage, minimum 51px (toujours impair).
+    Retourne la frame originale si aucun visage n'est détecté.
+    """
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    out = frame.copy()
+    blurred = False
+
+    for cascade in (_FRONTAL, _PROFILE):
+        faces = cascade.detectMultiScale(
+            gray, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30)
+        )
+        for x, y, fw, fh in faces:
+            k = max(51, fw | 1)  # impair, ≥ 51
+            out[y : y + fh, x : x + fw] = cv2.GaussianBlur(
+                out[y : y + fh, x : x + fw], (k, k), 0
+            )
+            blurred = True
+
+    return out if blurred else frame
+
 
 def extract_frames(video_path: str, fps: int = 25) -> list[np.ndarray]:
-    """Extrait les frames d'une vidéo au fps cible.
+    """Extrait les frames d'une vidéo au fps cible avec floutage visage (RGPD).
 
     Pour une source à 50fps, step=2 → 25fps effectif (1 frame sur 2).
-
-    TODO RGPD : appliquer le floutage visage (MediaPipe FaceMesh) avant
-    tout write disque dans frame_extractor. Priorité avant mise en prod.
+    Les visages sont floutés en mémoire avant tout usage des frames.
 
     Args:
         video_path: Chemin vers la vidéo source.
         fps: Fréquence d'échantillonnage cible en images/seconde.
 
     Returns:
-        Liste de frames BGR sous forme de tableaux NumPy.
+        Liste de frames BGR avec visages floutés.
 
     Raises:
         ValueError: Si la vidéo ne peut pas être ouverte.
@@ -39,7 +71,7 @@ def extract_frames(video_path: str, fps: int = 25) -> list[np.ndarray]:
         if not ret:
             break
         if frame_idx % step == 0:
-            frames.append(frame)
+            frames.append(_blur_faces(frame))
         frame_idx += 1
 
     cap.release()
