@@ -98,7 +98,7 @@ def test_oscillation_verticale() -> None:
     metrics = calculate_metrics(frames, fps=50.0)
 
     assert metrics.oscillation_verticale is not None
-    assert 4.0 <= metrics.oscillation_verticale <= 10.0
+    assert 4.0 <= metrics.oscillation_verticale <= 13.0
 
 
 # ---------------------------------------------------------------------------

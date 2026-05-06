@@ -147,8 +147,8 @@ def _inclinaison_tronc(all_landmarks: list[list]) -> float | None:
         math.degrees(
             math.atan2(
                 direction
-                * (_xy_up(frame, _LEFT_HIP)[0] - _xy_up(frame, _LEFT_SHOULDER)[0]),
-                _xy_up(frame, _LEFT_HIP)[1] - _xy_up(frame, _LEFT_SHOULDER)[1],
+                * (_xy_up(frame, _LEFT_SHOULDER)[0] - _xy_up(frame, _LEFT_HIP)[0]),
+                _xy_up(frame, _LEFT_SHOULDER)[1] - _xy_up(frame, _LEFT_HIP)[1],
             )
         )
         for frame in all_landmarks
