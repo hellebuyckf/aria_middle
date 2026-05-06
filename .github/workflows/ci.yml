@@ -69,7 +69,7 @@ jobs:
         run: uv sync --frozen --all-groups
 
       - name: Exporter les dépendances de production
-        run: uv export --no-dev --format requirements-txt > /tmp/requirements.txt
+        run: uv export --no-dev --no-emit-project --format requirements-txt > /tmp/requirements.txt
 
       - name: pip-audit — audit des CVE
         run: uvx pip-audit --requirement /tmp/requirements.txt --desc
