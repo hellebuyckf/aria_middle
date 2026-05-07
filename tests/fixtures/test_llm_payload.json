@@ -1,0 +1,16 @@
+{
+  "model": "aria-ft",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Tu es ARIA-ft, assistant clinique spécialisé en biomécanique de la course. Réponds uniquement en JSON valide."
+    },
+    {
+      "role": "user",
+      "content": "Test de connectivité. Réponds avec le JSON suivant, sans modification : {\"status\": \"ok\", \"source\": \"aria-ft\", \"message\": \"Lien middle → back opérationnel\"}"
+    }
+  ],
+  "response_format": {"type": "json_object"},
+  "max_tokens": 64,
+  "temperature": 0
+}

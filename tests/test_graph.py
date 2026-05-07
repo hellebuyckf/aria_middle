@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 
 import numpy as np
 import pytest
@@ -6,7 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from core.graph import run_analysis, run_report
 from core.state import ARIAState, PubMedReference
+from models.diagnostic import DiagnosticLLM
 from models.metrics import BiomechanicalMetrics
+from models.report import ARIAReport
 from services.pose.mediapipe_service import Landmark, PoseLandmarks
 
 pytestmark = pytest.mark.asyncio
@@ -22,6 +25,24 @@ _FAKE_METRICS = BiomechanicalMetrics(
     oscillation_verticale=6.5,
     ratio_contact_suspension=0.60,
 )
+_FAKE_DIAGNOSTIC = DiagnosticLLM(
+    pathologie="Tendinite rotulienne",
+    confiance="faible",
+    justification="Métriques dans les normes.",
+)
+_FAKE_REPORT_JSON = ARIAReport(
+    session_id="SES-graph-001",
+    patient_id="PAT-042",
+    pathologie="Tendinite rotulienne",
+    confiance="faible",
+    justification_diagnostic="Métriques dans les normes.",
+    metriques_anormales=[],
+    recommandations=["Renforcement des abducteurs de hanche"],
+    references_pubmed=["Running cadence and injury risk"],
+    avertissement="Ce rapport est généré par un système d'IA.",
+    date_generation=datetime.now(timezone.utc).isoformat(),
+).model_dump_json()
+
 _FAKE_REFS: list[PubMedReference] = [
     PubMedReference(
         pmid="11111111",
@@ -49,6 +70,7 @@ _INITIAL_STATE = ARIAState(
     profil_chaussure=None,
     strava_charge=None,
     garmin_charge=None,
+    key_frames=[],
     metrics=None,
     diagnostic=None,
     rag_refs=[],
@@ -62,6 +84,11 @@ _INITIAL_STATE = ARIAState(
 @pytest.mark.skipif(
     not os.path.exists("data/sessions/sagittale_test.mp4"),
     reason="Vidéo de test absente — test ignoré",
+)
+@patch(
+    "agents.diagnosis_agent.generate_diagnostic",
+    new_callable=AsyncMock,
+    return_value=_FAKE_DIAGNOSTIC,
 )
 @patch(
     "agents.rag_agent.ChromaDBService",
@@ -78,10 +105,11 @@ async def test_pipeline_analyse(
     _mock_detect: MagicMock,
     _mock_calc: MagicMock,
     _mock_chroma: MagicMock,
+    _mock_diag: AsyncMock,
 ) -> None:
     result = await run_analysis(_INITIAL_STATE)
 
-    assert result["statut"] == "pret"
+    assert result["statut"] == "rag"
     assert result["metrics"] is not None
     assert result["diagnostic"] is not None
     assert isinstance(result["rag_refs"], list)
@@ -92,6 +120,16 @@ async def test_pipeline_analyse(
 @pytest.mark.skipif(
     not os.path.exists("data/sessions/sagittale_test.mp4"),
     reason="Vidéo de test absente — test ignoré",
+)
+@patch(
+    "agents.report_agent.llm.generate_report",
+    new_callable=AsyncMock,
+    return_value=_FAKE_REPORT_JSON,
+)
+@patch(
+    "agents.diagnosis_agent.generate_diagnostic",
+    new_callable=AsyncMock,
+    return_value=_FAKE_DIAGNOSTIC,
 )
 @patch(
     "agents.rag_agent.ChromaDBService",
@@ -105,9 +143,11 @@ async def test_pipeline_complet(
     _mock_detect: MagicMock,
     _mock_calc: MagicMock,
     _mock_chroma: MagicMock,
+    _mock_diag: AsyncMock,
+    _mock_report: AsyncMock,
 ) -> None:
     analyse = await run_analysis(_INITIAL_STATE)
-    assert analyse["statut"] == "pret"
+    assert analyse["statut"] == "rag"
 
     result = await run_report(analyse)
     assert result["statut"] == "rapport"
@@ -130,6 +170,7 @@ async def test_pipeline_fichier_manquant() -> None:
         profil_chaussure=None,
         strava_charge=None,
         garmin_charge=None,
+        key_frames=[],
         metrics=None,
         diagnostic=None,
         rag_refs=[],

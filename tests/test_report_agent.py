@@ -1,8 +1,12 @@
+from datetime import datetime, timezone
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from agents.report_agent import report_agent
 from core.state import ARIAState, PubMedReference
 from models.diagnostic import DiagnosticLLM
+from models.report import ARIAReport
 from models.metrics import BiomechanicalMetrics
 
 pytestmark = pytest.mark.asyncio
@@ -55,6 +59,7 @@ def state_for_report() -> ARIAState:
         profil_chaussure=None,
         strava_charge=None,
         garmin_charge=None,
+        key_frames=[],
         metrics=metrics,
         diagnostic=diagnostic,
         rag_refs=rag_refs,
@@ -65,7 +70,26 @@ def state_for_report() -> ARIAState:
     )
 
 
-async def test_report_agent_returns_valid_report(state_for_report: ARIAState) -> None:
+@patch("agents.report_agent.llm.generate_report", new_callable=AsyncMock)
+async def test_report_agent_returns_valid_report(
+    mock_generate: AsyncMock,
+    state_for_report: ARIAState,
+) -> None:
+    mock_generate.return_value = ARIAReport(
+        session_id="SES-test-001",
+        patient_id="PAT-test-001",
+        pathologie="Lombalgie",
+        confiance="élevée",
+        justification_diagnostic="Inclinaison tronc massive et cadence basse",
+        metriques_anormales=["inclinaison_tronc = 34.5° (norme : 5–10°)"],
+        recommandations=[
+            "Renforcement des abducteurs de hanche (3×15 reps, 3×/semaine)"
+        ],
+        references_pubmed=["Trunk lean and lumbar load during running"],
+        avertissement="Ce rapport est généré par un système d'IA.",
+        date_generation=datetime.now(timezone.utc).isoformat(),
+    ).model_dump_json()
+
     result = await report_agent(state_for_report)
 
     assert result["statut"] == "rapport"

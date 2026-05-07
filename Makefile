@@ -1,5 +1,9 @@
-.PHONY: help fetch-corpus index-corpus build-corpus serve test test-video \
-        test-diagnosis test-rag test-report test-graph lint format install download-model visualize clean
+.PHONY: help fetch-corpus index-corpus build-corpus serve debug health test-link test test-video \
+        test-diagnosis test-rag test-report test-graph lint format install download-model visualize \
+        docs docs-serve clean docker-build docker-up docker-down docker-logs docker-debug
+
+MIDDLE_URL ?= http://localhost:8000
+DOCS_DIR   ?= docs
 
 VIDEO  ?= data/sessions/test.mp4
 OUTPUT ?= output_pose.mp4
@@ -23,9 +27,40 @@ index-corpus: ## Indexe data/corpus/*.json dans ChromaDB (embeddings e5-multilin
 
 build-corpus: fetch-corpus index-corpus ## Télécharge ET indexe le corpus en une commande
 
+# ── Santé ────────────────────────────────────────────────────────────────────
+health: ## Vérifie la santé du middleware (port 8000) et du back LLM
+	@BACK=$$(grep -m1 '^URL_BACK_LLM=' .env 2>/dev/null | cut -d= -f2- | tr -d ' '); \
+	BACK=$${BACK:-http://localhost:8001}; \
+	echo "── Middleware ($(MIDDLE_URL)/health) ──"; \
+	BODY=$$(curl -sf --max-time 3 $(MIDDLE_URL)/health) && (echo "$$BODY" | python3 -m json.tool 2>/dev/null || echo "  ✓ ok") || echo "  ✗ middleware non joignable"; \
+	echo "── Back LLM ($${BACK}/health) ──"; \
+	HTTP=$$(curl -so /dev/null -w "%{http_code}" --max-time 3 $${BACK}/health); \
+	[ "$$HTTP" = "200" ] && echo "  ✓ ok (HTTP $$HTTP)" || echo "  ✗ back LLM non joignable (HTTP $$HTTP)"
+
+test-link: ## Envoie le payload tests/fixtures/test_llm_payload.json au back LLM et affiche la réponse
+	uv run python scripts/test_llm_link.py
+
 # ── Serveur ──────────────────────────────────────────────────────────────────
 serve: ## Lance le serveur FastAPI en mode rechargement (port 8000)
 	uv run uvicorn main:app --reload --port 8000
+
+debug: ## Lance le serveur en mode debug (LOG_LEVEL=DEBUG + tracebacks complets)
+	LOG_LEVEL=DEBUG uv run uvicorn main:app --reload --port 8000 --log-level debug
+
+docker-build: ## Construit l'image Docker aria_middle
+	docker compose build
+
+docker-up: ## Lance le conteneur en arrière-plan
+	docker compose up -d
+
+docker-down: ## Arrête et supprime le conteneur
+	docker compose down
+
+docker-logs: ## Suit les logs du conteneur en temps réel
+	docker compose logs -f aria_middle
+
+docker-debug: ## Lance le conteneur avec LOG_LEVEL=DEBUG
+	LOG_LEVEL=DEBUG docker compose up
 
 # ── Tests ────────────────────────────────────────────────────────────────────
 test: ## Lance tous les tests pytest
@@ -68,8 +103,18 @@ download-model: ## Télécharge le modèle MediaPipe PoseLandmarker
 visualize: ## Génère une vidéo annotée MediaPipe (VIDEO=... OUTPUT=...)
 	uv run python scripts/visualize_pose.py --video $(VIDEO) --output $(OUTPUT)
 
+# ── Documentation ────────────────────────────────────────────────────────────
+docs: ## Génère la documentation HTML depuis les docstrings (pdoc → $(DOCS_DIR)/)
+	uv run --with pdoc pdoc --output-dir $(DOCS_DIR) \
+		agents services core models api
+	@echo "Documentation générée → $(DOCS_DIR)/index.html"
+
+docs-serve: ## Sert la documentation en live avec rechargement automatique (port 8080)
+	uv run --with pdoc pdoc --port 8080 agents services core models api
+
 # ── Nettoyage ────────────────────────────────────────────────────────────────
-clean: ## Supprime __pycache__, .pytest_cache et fichiers .pyc
+clean: ## Supprime __pycache__, .pytest_cache, fichiers .pyc et la doc générée
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type d -name ".pytest_cache" -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
+	rm -rf $(DOCS_DIR)

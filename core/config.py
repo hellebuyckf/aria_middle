@@ -13,6 +13,10 @@ class Settings(BaseSettings):
         default="http://localhost:8001/v1",
         description="URL de l'API vLLM (aria_llm sur le PC RTX).",
     )
+    URL_BACK_LLM: str = Field(
+        default="http://localhost:8001",
+        description="URL racine du back LLM pour le health check.",
+    )
     CHROMADB_PATH: str = Field(
         default="./data/corpus",
         description="Répertoire de la base vectorielle ChromaDB.",
@@ -26,6 +30,10 @@ class Settings(BaseSettings):
         description="Durée de rétention des vidéos en jours (RGPD).",
     )
     LOG_LEVEL: str = Field(default="INFO")
+    BLUR_FACES: bool = Field(
+        default=True,
+        description="Active le floutage des visages (RGPD). Désactiver uniquement en dev local.",
+    )
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
