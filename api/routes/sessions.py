@@ -46,16 +46,22 @@ async def _run_pipeline(state: ARIAState) -> None:
         result = await run_report(sessions_store[session_id])
         sessions_store[session_id] = result
         logger.info("[{}] Rapport généré | statut={}", session_id, result["statut"])
-        await broadcast(
-            session_id,
-            {
-                "type": "completed",
-                "etape": "rapport",
-                "rapport_url": f"/api/sessions/{session_id}/report",
-            },
-        )
+        if result["statut"] == "erreur":
+            await broadcast(
+                session_id,
+                {"type": "error", "etape": "rapport", "message": result["erreur"]},
+            )
+        else:
+            await broadcast(
+                session_id,
+                {
+                    "type": "completed",
+                    "etape": "rapport",
+                    "rapport_url": f"/api/sessions/{session_id}/report",
+                },
+            )
     except Exception as exc:
-        logger.error("[{}] Pipeline erreur inattendue : {}", session_id, exc)
+        logger.exception("[{}] Pipeline erreur inattendue : {}", session_id, exc)
         sessions_store[session_id] = ARIAState(
             **{**state, "statut": "erreur", "erreur": str(exc)}
         )
@@ -120,6 +126,7 @@ async def create_session(
         profil_chaussure=_parse_profil_chaussure(profil_chaussure),
         strava_charge=None,
         garmin_charge=None,
+        key_frames=[],
         metrics=None,
         diagnostic=None,
         rag_refs=[],

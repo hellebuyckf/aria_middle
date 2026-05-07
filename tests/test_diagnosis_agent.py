@@ -1,7 +1,10 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from agents.diagnosis_agent import diagnosis_agent
 from core.state import ARIAState
+from models.diagnostic import DiagnosticLLM
 from models.metrics import BiomechanicalMetrics
 
 pytestmark = pytest.mark.asyncio
@@ -37,6 +40,7 @@ def state_with_metrics() -> ARIAState:
         profil_chaussure=None,
         strava_charge=None,
         garmin_charge=None,
+        key_frames=[],
         metrics=metrics,
         diagnostic=None,
         rag_refs=[],
@@ -47,7 +51,17 @@ def state_with_metrics() -> ARIAState:
     )
 
 
+@patch(
+    "agents.diagnosis_agent.generate_diagnostic",
+    new_callable=AsyncMock,
+    return_value=DiagnosticLLM(
+        pathologie="Lombalgie",
+        confiance="élevée",
+        justification="Inclinaison tronc excessive (34.5°).",
+    ),
+)
 async def test_diagnosis_agent_returns_diagnostic(
+    _mock_llm: AsyncMock,
     state_with_metrics: ARIAState,
 ) -> None:
     result = await diagnosis_agent(state_with_metrics)

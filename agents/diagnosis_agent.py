@@ -5,8 +5,7 @@ from core.state import ARIAState
 from models.diagnostic import DiagnosticLLM
 from services.llm.prompt_builder import build_diagnostic_prompt
 
-# TODO: basculer sur services.llm.vllm_client en prod
-from services.llm.vllm_client_mock import generate_diagnostic
+from services.llm.vllm_client import generate_diagnostic
 
 
 async def diagnosis_agent(state: ARIAState) -> dict:

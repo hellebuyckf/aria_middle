@@ -1,0 +1,16 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.ruff_cache
+data/sessions
+data/video
+*.mp4
+output_pose.mp4
+docs/
+.env
+.git
+.gitignore
+audit1.md
+README.md

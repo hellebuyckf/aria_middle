@@ -7,6 +7,7 @@ from loguru import logger
 
 import core.events as events
 from core.state import ARIAState
+from services.pose.frame_annotator import select_key_frames
 from services.pose.frame_extractor import extract_frames
 from services.pose.mediapipe_service import detect_pose
 from services.pose.metrics_calculator import (
@@ -200,7 +201,23 @@ async def video_agent(state: ARIAState) -> ARIAState:
                     "message": "Vidéo analysée",
                 },
             )
-        return {**state, "metrics": metrics, "statut": "rag"}
+
+        # --- Captures annotées pour le rapport PDF ---
+        await events.emit(
+            session_id,
+            {
+                "type": "progress",
+                "etape": "video",
+                "pct": 42,
+                "message": "Génération des captures clés...",
+            },
+        )
+        key_frames = await loop.run_in_executor(
+            None, partial(select_key_frames, frames_sag, raw_sag, metrics, 25.0)
+        )
+        logger.info(f"[{session_id}] {len(key_frames)} capture(s) clé(s) générée(s)")
+
+        return {**state, "key_frames": key_frames, "metrics": metrics, "statut": "rag"}
 
     except ARIAVideoError:
         raise

@@ -52,6 +52,11 @@
   .ref-list li { padding: 3px 0; font-size: 8.5pt; color: #444; }
   .ref-list li::before { content: "• "; color: #1b4fac; }
 
+  /* ── Key frames grid ── */
+  .frames-table { width: 100%; border-collapse: collapse; margin: 6px 0; page-break-inside: avoid; }
+  .frame-cell { width: 50%; padding: 4px; vertical-align: top; }
+  .frame-cell img { width: 100%; border: 1px solid #c8d8f5; border-radius: 3px; display: block; }
+
   /* ── Warning ── */
   .warning { margin-top: 20px; border: 1px solid #d1d5db; border-radius: 4px; padding: 8px 12px; font-size: 8pt; color: #666; background: #f9fafb; }
   .warning strong { color: #374151; }
@@ -120,6 +125,25 @@
       <td class="norm-col">{{ row.norm }}</td>
     </tr>
     {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<!-- CAPTURES CLÉS ANNOTÉES -->
+{% if key_frames %}
+<h2>Captures clés annotées</h2>
+<table class="frames-table">
+  <tbody>
+  {% for i in range(0, key_frames|length, 2) %}
+  <tr>
+    <td class="frame-cell"><img src="data:image/png;base64,{{ key_frames[i] }}" alt="Capture {{ i + 1 }}"/></td>
+    {% if i + 1 < key_frames|length %}
+    <td class="frame-cell"><img src="data:image/png;base64,{{ key_frames[i + 1] }}" alt="Capture {{ i + 2 }}"/></td>
+    {% else %}
+    <td class="frame-cell"></td>
+    {% endif %}
+  </tr>
+  {% endfor %}
   </tbody>
 </table>
 {% endif %}

@@ -39,6 +39,7 @@ class ARIAState(TypedDict):
     strava_charge: dict | None
     garmin_charge: dict | None
     # Pipeline
+    key_frames: list[str]  # base64 PNG annotées, max 4, générées par video_agent
     metrics: BiomechanicalMetrics | None
     diagnostic: DiagnosticLLM | None
     rag_refs: list[PubMedReference]

@@ -32,6 +32,7 @@ def _state(diagnostic: DiagnosticLLM | None) -> ARIAState:
         profil_chaussure=None,
         strava_charge=None,
         garmin_charge=None,
+        key_frames=[],
         metrics=None,
         diagnostic=diagnostic,
         rag_refs=[],

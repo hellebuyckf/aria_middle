@@ -1,8 +1,13 @@
+import json
+from datetime import date
+
+from loguru import logger
+
 import core.events as events
 from core.state import ARIAState
 from models.metrics import BiomechanicalMetrics
 from models.report import ARIAReport
-from services.llm import vllm_client_mock as llm
+from services.llm import vllm_client as llm
 
 
 def _build_prompt(state: ARIAState) -> str:
@@ -38,11 +43,14 @@ def _build_prompt(state: ARIAState) -> str:
     lines += [
         "",
         "## Consigne",
-        "Retourne un JSON valide correspondant au schéma ARIAReport avec :",
-        "- les métriques hors norme identifiées (metriques_anormales)",
-        "- un protocole de rééducation personnalisé (recommandations)",
-        "- les titres des références utilisées (references_pubmed)",
-        "- un avertissement invitant le praticien à confirmer le diagnostic (avertissement)",
+        "Retourne UNIQUEMENT un objet JSON valide avec exactement ces champs :",
+        '- "pathologie": string — pathologie identifiée',
+        '- "confiance": string — niveau de confiance (élevé / moyen / faible)',
+        '- "justification_diagnostic": string — justification clinique détaillée',
+        '- "metriques_anormales": array of strings — liste des métriques hors norme',
+        '- "recommandations": array of strings — protocole de rééducation personnalisé',
+        '- "references_pubmed": array of strings — titres des références utilisées',
+        '- "avertissement": string — invitation au praticien à confirmer le diagnostic',
     ]
 
     return "\n".join(lines)
@@ -84,7 +92,11 @@ async def report_agent(state: ARIAState) -> dict:
         finally:
             ticker.cancel()
 
-        report = ARIAReport.model_validate_json(raw_json)
+        data = json.loads(raw_json)
+        data["session_id"] = session_id
+        data["patient_id"] = state["patient_id"]
+        data["date_generation"] = date.today().isoformat()
+        report = ARIAReport.model_validate(data)
         await events.emit(
             session_id,
             {
@@ -96,4 +108,5 @@ async def report_agent(state: ARIAState) -> dict:
         )
         return {"report": report, "statut": "rapport", "erreur": None}
     except Exception as exc:
+        logger.exception("[{}] report_agent échec : {}", session_id, exc)
         return {"report": None, "statut": "erreur", "erreur": str(exc)}

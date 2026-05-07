@@ -19,7 +19,7 @@ async def _check_chromadb() -> str:
 
 
 async def _check_vllm() -> str:
-    url = settings.VLLM_BASE_URL.rstrip("/v1").rstrip("/") + "/health"
+    url = settings.URL_BACK_LLM.rstrip("/") + "/health"
     try:
         async with httpx.AsyncClient(timeout=2.0) as client:
             resp = await client.get(url)

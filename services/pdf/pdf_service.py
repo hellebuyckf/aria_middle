@@ -94,10 +94,13 @@ def _build_html(state: ARIAState) -> str:
                     }
                 )
 
+    key_frames: list[str] = state.get("key_frames") or []  # type: ignore[call-overload]
+
     return _env.get_template("report_template.html").render(
         report=report,
         rows_sag=rows_sag,
         rows_post=rows_post,
+        key_frames=key_frames,
     )
 
 

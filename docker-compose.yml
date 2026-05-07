@@ -1,0 +1,11 @@
+services:
+  aria_middle:
+    build: .
+    container_name: aria_middle
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./pose_landmarker_full.task:/app/pose_landmarker_full.task:ro
+    restart: unless-stopped

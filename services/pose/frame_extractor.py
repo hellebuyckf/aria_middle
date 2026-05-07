@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from loguru import logger
 
+from core.config import settings
+
 # Cascades Haar OpenCV — disponibles sans modèle externe (bundlées dans cv2)
 # frontal : coureur face caméra ; profil : vue sagittale (cas le plus fréquent)
 _FRONTAL: cv2.CascadeClassifier = cv2.CascadeClassifier(
@@ -71,7 +73,7 @@ def extract_frames(video_path: str, fps: int = 25) -> list[np.ndarray]:
         if not ret:
             break
         if frame_idx % step == 0:
-            frames.append(_blur_faces(frame))
+            frames.append(_blur_faces(frame) if settings.BLUR_FACES else frame)
         frame_idx += 1
 
     cap.release()
