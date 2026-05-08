@@ -43,7 +43,11 @@ async def _run_pipeline(state: ARIAState) -> None:
             sessions_store[session_id] = analysis
             await broadcast(
                 session_id,
-                {"type": "error", "etape": "analyse", "message": analysis.get("erreur", "Erreur inconnue")},
+                {
+                    "type": "error",
+                    "etape": "analyse",
+                    "message": analysis.get("erreur", "Erreur inconnue"),
+                },
             )
             return
         sessions_store[session_id] = ARIAState(**{**analysis, "statut": "pret"})
@@ -61,14 +65,22 @@ async def _run_pipeline(state: ARIAState) -> None:
         else:
             # Génération et mise en cache PDF sur disque + libération key_frames
             loop = asyncio.get_running_loop()
-            pdf_path = Path(settings.SESSIONS_DIR) / session_id / f"aria_{session_id}.pdf"
+            pdf_path = (
+                Path(settings.SESSIONS_DIR) / session_id / f"aria_{session_id}.pdf"
+            )
             try:
                 pdf_bytes = await loop.run_in_executor(None, render_pdf, result)
                 pdf_path.write_bytes(pdf_bytes)
                 sessions_store[session_id] = ARIAState(**{**result, "key_frames": []})
-                logger.info("[{}] PDF mis en cache ({} Ko)", session_id, len(pdf_bytes) // 1024)
+                logger.info(
+                    "[{}] PDF mis en cache ({} Ko)", session_id, len(pdf_bytes) // 1024
+                )
             except Exception as pdf_exc:
-                logger.warning("[{}] Mise en cache PDF échouée, key_frames conservées : {}", session_id, pdf_exc)
+                logger.warning(
+                    "[{}] Mise en cache PDF échouée, key_frames conservées : {}",
+                    session_id,
+                    pdf_exc,
+                )
             await broadcast(
                 session_id,
                 {

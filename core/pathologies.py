@@ -14,7 +14,9 @@ class Pathologie:
 def _load() -> list[Pathologie]:
     with open(_TOML_PATH, "rb") as f:
         data = tomllib.load(f)
-    return [Pathologie(nom=p["nom"], metriques=p["metriques"]) for p in data["pathologies"]]
+    return [
+        Pathologie(nom=p["nom"], metriques=p["metriques"]) for p in data["pathologies"]
+    ]
 
 
 # Chargé une seule fois au démarrage.

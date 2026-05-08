@@ -11,7 +11,12 @@ async def diagnosis_agent(state: ARIAState) -> dict:
     session_id = state["session_id"]
     await events.emit(
         session_id,
-        {"type": "progress", "etape": "diagnostic", "pct": 43, "message": "Analyse diagnostique..."},
+        {
+            "type": "progress",
+            "etape": "diagnostic",
+            "pct": 43,
+            "message": "Analyse diagnostique...",
+        },
     )
 
     metrics = state["metrics"]
@@ -38,12 +43,25 @@ async def diagnosis_agent(state: ARIAState) -> dict:
     try:
         result: DiagnosticLLM = await generate_diagnostic(prompt)
     except asyncio.TimeoutError:
-        return {"diagnostic": None, "statut": "erreur", "erreur": "diagnosis_agent: timeout LLM"}
+        return {
+            "diagnostic": None,
+            "statut": "erreur",
+            "erreur": "diagnosis_agent: timeout LLM",
+        }
     except Exception as exc:
-        return {"diagnostic": None, "statut": "erreur", "erreur": f"diagnosis_agent: {exc}"}
+        return {
+            "diagnostic": None,
+            "statut": "erreur",
+            "erreur": f"diagnosis_agent: {exc}",
+        }
 
     await events.emit(
         session_id,
-        {"type": "progress", "etape": "diagnostic", "pct": 50, "message": "Diagnostic établi"},
+        {
+            "type": "progress",
+            "etape": "diagnostic",
+            "pct": 50,
+            "message": "Diagnostic établi",
+        },
     )
     return {"diagnostic": result, "statut": "diagnostic", "erreur": None}

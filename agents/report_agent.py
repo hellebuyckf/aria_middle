@@ -38,7 +38,12 @@ _REPORT_LLM_SCHEMA: dict = {
         "references_pubmed": {"type": "array", "items": {"type": "string"}},
         "avertissement": {"type": "string"},
     },
-    "required": ["justification_diagnostic", "recommandations", "references_pubmed", "avertissement"],
+    "required": [
+        "justification_diagnostic",
+        "recommandations",
+        "references_pubmed",
+        "avertissement",
+    ],
 }
 
 
@@ -47,7 +52,9 @@ def _is_abnormal(field: str, value: float) -> bool:
     return (lo is not None and value < lo) or (hi is not None and value > hi)
 
 
-def _compute_abnormal_metrics(metrics: BiomechanicalMetrics, pathologie: str) -> list[str]:
+def _compute_abnormal_metrics(
+    metrics: BiomechanicalMetrics, pathologie: str
+) -> list[str]:
     """Retourne les noms des métriques hors norme, filtrées par pathologie."""
     return [
         field
@@ -56,12 +63,16 @@ def _compute_abnormal_metrics(metrics: BiomechanicalMetrics, pathologie: str) ->
     ]
 
 
-def _relevant_metrics(metrics: BiomechanicalMetrics, pathologie: str) -> dict[str, object]:
+def _relevant_metrics(
+    metrics: BiomechanicalMetrics, pathologie: str
+) -> dict[str, object]:
     """Retourne uniquement les métriques pertinentes pour la pathologie diagnostiquée."""
     allowed = metriques_pour(pathologie)
     data = metrics.model_dump()
     if allowed is None:
-        return {k: v for k, v in data.items() if k not in _EXCLUDED_FIELDS and v is not None}
+        return {
+            k: v for k, v in data.items() if k not in _EXCLUDED_FIELDS and v is not None
+        }
     return {k: data[k] for k in allowed if data.get(k) is not None}
 
 
@@ -86,9 +97,7 @@ def _build_prompt(state: ARIAState) -> str:
     if metrics:
         for field_name, value in _relevant_metrics(metrics, pathologie).items():
             field_info = BiomechanicalMetrics.model_fields[field_name]
-            lines.append(
-                f'- "{field_name}": {value}  # {field_info.description or ""}'
-            )
+            lines.append(f'- "{field_name}": {value}  # {field_info.description or ""}')
 
     lines += ["", "## Références PubMed (top-5)"]
     for ref in refs[:5]:

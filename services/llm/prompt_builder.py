@@ -4,17 +4,17 @@ from models.metrics import BiomechanicalMetrics
 
 # (champ, unité, lo, hi) — None = borne ouverte
 _METRIC_NORMS: list[tuple[str, str, float | None, float | None]] = [
-    ("cadence",                   "foulées/min", 170.0, 180.0),
-    ("angle_attaque_pied",        "°",           None,  10.0),
-    ("flexion_genou_impact",      "°",           15.0,  25.0),
-    ("inclinaison_tronc",         "°",           5.0,   10.0),
-    ("oscillation_verticale",     "cm",          None,  8.0),
-    ("ratio_contact_suspension",  "",            0.35,  0.65),
-    ("pelvic_drop",               "°",           None,  5.0),
-    ("valgus_genou",              "°",           None,  8.0),
-    ("asymetrie_charge",          "%",           None,  10.0),
-    ("oscillation_laterale_hanche", "cm",        None,  3.0),
-    ("pronation_pied",            "°",           None,  8.0),
+    ("cadence", "foulées/min", 170.0, 180.0),
+    ("angle_attaque_pied", "°", None, 10.0),
+    ("flexion_genou_impact", "°", 15.0, 25.0),
+    ("inclinaison_tronc", "°", 5.0, 10.0),
+    ("oscillation_verticale", "cm", None, 8.0),
+    ("ratio_contact_suspension", "", 0.35, 0.65),
+    ("pelvic_drop", "°", None, 5.0),
+    ("valgus_genou", "°", None, 8.0),
+    ("asymetrie_charge", "%", None, 10.0),
+    ("oscillation_laterale_hanche", "cm", None, 3.0),
+    ("pronation_pied", "°", None, 8.0),
 ]
 
 
@@ -30,7 +30,6 @@ def _norm_str(lo: float | None, hi: float | None, unit: str) -> str:
 
 def _is_abnormal(value: float, lo: float | None, hi: float | None) -> bool:
     return (lo is not None and value < lo) or (hi is not None and value > hi)
-
 
 
 def _section_contexte_patient(
