@@ -4,7 +4,6 @@ import core.events as events
 from core.state import ARIAState
 from models.diagnostic import DiagnosticLLM
 from services.llm.prompt_builder import build_diagnostic_prompt
-
 from services.llm.vllm_client import generate_diagnostic
 
 
@@ -47,7 +46,7 @@ async def diagnosis_agent(state: ARIAState) -> dict:
         return {
             "diagnostic": None,
             "statut": "erreur",
-            "erreur": "diagnosis_agent: timeout lors de l'appel au LLM",
+            "erreur": "diagnosis_agent: timeout LLM",
         }
     except Exception as exc:
         return {
@@ -65,8 +64,4 @@ async def diagnosis_agent(state: ARIAState) -> dict:
             "message": "Diagnostic établi",
         },
     )
-    return {
-        "diagnostic": result,
-        "statut": "diagnostic",
-        "erreur": None,
-    }
+    return {"diagnostic": result, "statut": "diagnostic", "erreur": None}

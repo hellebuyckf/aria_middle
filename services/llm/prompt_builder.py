@@ -1,29 +1,35 @@
+from core.pathologies import NOMS
 from core.state import ProfilChaussure
 from models.metrics import BiomechanicalMetrics
 
-# (champ, unité, norme textuelle)
-_METRIC_NORMS: list[tuple[str, str, str]] = [
-    ("cadence", "foulées/min", "norme : 170–180 spm"),
-    ("angle_attaque_pied", "°", "norme : < 5° (avant-pied) ou > 10° (talon)"),
-    ("flexion_genou_impact", "°", "norme : 15–25°"),
-    ("inclinaison_tronc", "°", "norme : 5–10° forward lean"),
-    ("oscillation_verticale", "cm", "norme : < 8 cm"),
-    ("ratio_contact_suspension", "", "norme : < 0.5"),
-    ("pelvic_drop", "°", "norme : < 5°"),
-    ("valgus_genou", "°", "norme : < 8°"),
-    ("asymetrie_charge", "%", "norme : < 10 %"),
-    ("oscillation_laterale_hanche", "cm", "norme : < 3 cm"),
-    ("pronation_pied", "°", "norme : < 8°"),
+# (champ, unité, lo, hi) — None = borne ouverte
+_METRIC_NORMS: list[tuple[str, str, float | None, float | None]] = [
+    ("cadence", "foulées/min", 170.0, 180.0),
+    ("angle_attaque_pied", "°", None, 10.0),
+    ("flexion_genou_impact", "°", 15.0, 25.0),
+    ("inclinaison_tronc", "°", 5.0, 10.0),
+    ("oscillation_verticale", "cm", None, 8.0),
+    ("ratio_contact_suspension", "", 0.35, 0.65),
+    ("pelvic_drop", "°", None, 5.0),
+    ("valgus_genou", "°", None, 8.0),
+    ("asymetrie_charge", "%", None, 10.0),
+    ("oscillation_laterale_hanche", "cm", None, 3.0),
+    ("pronation_pied", "°", None, 8.0),
 ]
 
-_MVP_PATHOLOGIES = (
-    "Lombalgie",
-    "SBIT (syndrome de la bandelette ilio-tibiale)",
-    "Tendinite rotulienne",
-    "Syndrome fémoro-patellaire",
-    "Attaque talon excessive",
-    "Asymétrie de charge",
-)
+
+def _norm_str(lo: float | None, hi: float | None, unit: str) -> str:
+    if lo is not None and hi is not None:
+        return f"norme : {lo}–{hi}{unit}"
+    if hi is not None:
+        return f"norme : < {hi}{unit}"
+    if lo is not None:
+        return f"norme : > {lo}{unit}"
+    return ""
+
+
+def _is_abnormal(value: float, lo: float | None, hi: float | None) -> bool:
+    return (lo is not None and value < lo) or (hi is not None and value > hi)
 
 
 def _section_contexte_patient(
@@ -104,14 +110,22 @@ def build_diagnostic_prompt(
     lines += _section_profil_chaussure(profil_chaussure)
     lines += _section_charge_entrainement(strava_charge, garmin_charge)
 
-    lines.append("## MÉTRIQUES")
     data = metrics.model_dump()
-    for field, unit, norm in _METRIC_NORMS:
+    anormales = []
+    normales = []
+    for field, unit, lo, hi in _METRIC_NORMS:
         value = data.get(field)
         if value is None:
             continue
         unit_str = f" {unit}" if unit else ""
-        lines.append(f'- "{field}": {value}{unit_str}  [{norm}]')
+        norm = _norm_str(lo, hi, unit_str)
+        if _is_abnormal(float(value), lo, hi):
+            anormales.append(f'- [ANORMAL] "{field}": {value}{unit_str}  [{norm}]')
+        else:
+            normales.append(f'- [normal]  "{field}": {value}{unit_str}  [{norm}]')
+
+    lines.append("## MÉTRIQUES")
+    lines += anormales + normales
 
     lines += [
         "",
@@ -119,8 +133,9 @@ def build_diagnostic_prompt(
         pathologie_declaree if pathologie_declaree else "aucune",
         "",
         "## INSTRUCTION",
+        "Base-toi UNIQUEMENT sur les métriques marquées [ANORMAL] pour identifier la pathologie.",
         "Identifie la pathologie la plus probable parmi les suivantes :",
-        ", ".join(f'"{p}"' for p in _MVP_PATHOLOGIES) + ".",
+        ", ".join(f'"{p}"' for p in NOMS) + ".",
         "",
         "Réponds UNIQUEMENT en JSON avec les clés suivantes :",
         '{ "pathologie": "<nom>", "confiance": "élevée|modérée|faible", '

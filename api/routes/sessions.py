@@ -39,6 +39,17 @@ async def _run_pipeline(state: ARIAState) -> None:
     try:
         # Phase 1 : vidéo → diagnostic → RAG
         analysis = await run_analysis(state)
+        if analysis.get("statut") == "erreur":
+            sessions_store[session_id] = analysis
+            await broadcast(
+                session_id,
+                {
+                    "type": "error",
+                    "etape": "analyse",
+                    "message": analysis.get("erreur", "Erreur inconnue"),
+                },
+            )
+            return
         sessions_store[session_id] = ARIAState(**{**analysis, "statut": "pret"})
         logger.info("[{}] Analyse terminée", session_id)
 
@@ -52,6 +63,24 @@ async def _run_pipeline(state: ARIAState) -> None:
                 {"type": "error", "etape": "rapport", "message": result["erreur"]},
             )
         else:
+            # Génération et mise en cache PDF sur disque + libération key_frames
+            loop = asyncio.get_running_loop()
+            pdf_path = (
+                Path(settings.SESSIONS_DIR) / session_id / f"aria_{session_id}.pdf"
+            )
+            try:
+                pdf_bytes = await loop.run_in_executor(None, render_pdf, result)
+                pdf_path.write_bytes(pdf_bytes)
+                sessions_store[session_id] = ARIAState(**{**result, "key_frames": []})
+                logger.info(
+                    "[{}] PDF mis en cache ({} Ko)", session_id, len(pdf_bytes) // 1024
+                )
+            except Exception as pdf_exc:
+                logger.warning(
+                    "[{}] Mise en cache PDF échouée, key_frames conservées : {}",
+                    session_id,
+                    pdf_exc,
+                )
             await broadcast(
                 session_id,
                 {
@@ -175,8 +204,12 @@ async def download_report(session_id: str) -> Response:
         raise HTTPException(
             status_code=409, detail=f"Rapport non disponible (statut={state['statut']})"
         )
-    loop = asyncio.get_running_loop()
-    pdf_bytes = await loop.run_in_executor(None, render_pdf, state)
+    pdf_path = Path(settings.SESSIONS_DIR) / session_id / f"aria_{session_id}.pdf"
+    if pdf_path.exists():
+        pdf_bytes = pdf_path.read_bytes()
+    else:
+        loop = asyncio.get_running_loop()
+        pdf_bytes = await loop.run_in_executor(None, render_pdf, state)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
