@@ -5,6 +5,12 @@ services:
     ports:
       - "8000:8000"
     env_file: .env
+    environment:
+      - VLLM_BASE_URL=http://host.docker.internal:8001/v1
+      - URL_BACK_LLM=http://host.docker.internal:8001
+    user: "1000:1000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/app/data
       - ./pose_landmarker_full.task:/app/pose_landmarker_full.task:ro

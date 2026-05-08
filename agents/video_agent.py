@@ -133,6 +133,22 @@ async def video_agent(state: ARIAState) -> ARIAState:
             },
         )
 
+        # --- Captures annotées (avant vue postérieure pour libérer frames_sag) ---
+        await events.emit(
+            session_id,
+            {
+                "type": "progress",
+                "etape": "video",
+                "pct": 39,
+                "message": "Génération des captures clés...",
+            },
+        )
+        key_frames = await loop.run_in_executor(
+            None, partial(select_key_frames, frames_sag, raw_sag, metrics, 25.0)
+        )
+        logger.info(f"[{session_id}] {len(key_frames)} capture(s) clé(s) générée(s)")
+        del frames_sag, raw_sag
+
         # --- Vue postérieure (facultative) ---
         if video_path_posterior is not None:
             if not os.path.exists(video_path_posterior):
@@ -201,21 +217,6 @@ async def video_agent(state: ARIAState) -> ARIAState:
                     "message": "Vidéo analysée",
                 },
             )
-
-        # --- Captures annotées pour le rapport PDF ---
-        await events.emit(
-            session_id,
-            {
-                "type": "progress",
-                "etape": "video",
-                "pct": 42,
-                "message": "Génération des captures clés...",
-            },
-        )
-        key_frames = await loop.run_in_executor(
-            None, partial(select_key_frames, frames_sag, raw_sag, metrics, 25.0)
-        )
-        logger.info(f"[{session_id}] {len(key_frames)} capture(s) clé(s) générée(s)")
 
         return {**state, "key_frames": key_frames, "metrics": metrics, "statut": "rag"}
 

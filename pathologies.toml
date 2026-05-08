@@ -1,0 +1,67 @@
+# Référentiel des pathologies ARIA
+# Les noms doivent correspondre exactement aux valeurs du dropdown frontend.
+# Ajouter une pathologie ici suffit — aucun code à modifier.
+#
+# metriques : métriques transmises au LLM pour le rapport de cette pathologie.
+#             Doit correspondre aux champs de BiomechanicalMetrics.
+
+[[pathologies]]
+nom = "Lombalgie (douleur lombaire à l'effort)"
+metriques = [
+    "cadence",
+    "inclinaison_tronc",
+    "oscillation_verticale",
+    "flexion_genou_impact",
+    "ratio_contact_suspension",
+]
+
+[[pathologies]]
+nom = "Tendinite rotulienne (syndrome fémoro-patellaire)"
+metriques = [
+    "flexion_genou_impact",
+    "valgus_genou",
+    "pelvic_drop",
+    "pronation_pied",
+    "cadence",
+]
+
+[[pathologies]]
+nom = "Syndrome de la bandelette ilio-tibiale (SBIT)"
+metriques = [
+    "cadence",
+    "pelvic_drop",
+    "oscillation_laterale_hanche",
+    "valgus_genou",
+    "inclinaison_tronc",
+    "ratio_contact_suspension",
+]
+
+[[pathologies]]
+nom = "Périostite tibiale (shin splints)"
+metriques = [
+    "cadence",
+    "angle_attaque_pied",
+    "oscillation_verticale",
+    "ratio_contact_suspension",
+    "flexion_genou_impact",
+]
+
+[[pathologies]]
+nom = "Tendinite du tendon d'Achille"
+metriques = [
+    "angle_attaque_pied",
+    "cadence",
+    "ratio_contact_suspension",
+    "oscillation_verticale",
+    "flexion_genou_impact",
+]
+
+[[pathologies]]
+nom = "Fasciite plantaire"
+metriques = [
+    "angle_attaque_pied",
+    "pronation_pied",
+    "cadence",
+    "ratio_contact_suspension",
+    "oscillation_verticale",
+]

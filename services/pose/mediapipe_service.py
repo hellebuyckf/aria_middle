@@ -1,3 +1,4 @@
+import gc
 from dataclasses import dataclass
 
 import cv2
@@ -92,6 +93,10 @@ def detect_pose(
                 for lm in raw_lms
             ]
             results.append(PoseLandmarks(frame_index=i, landmarks=landmarks))
+
+    # Force la libération des ressources C++ internes de MediaPipe (sémaphores)
+    # avant que le resource_tracker du GC ne signale des fuites au shutdown.
+    gc.collect()
 
     nb_detectes = sum(1 for r in results if r is not None)
     logger.info(f"MediaPipe : {nb_detectes}/{len(frames)} frames détectées")
