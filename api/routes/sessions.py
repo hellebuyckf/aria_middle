@@ -68,6 +68,7 @@ async def _run_pipeline(state: ARIAState) -> None:
             pdf_path = (
                 Path(settings.SESSIONS_DIR) / session_id / f"aria_{session_id}.pdf"
             )
+            key_frames_snapshot = result.get("key_frames") or []
             try:
                 pdf_bytes = await loop.run_in_executor(None, render_pdf, result)
                 pdf_path.write_bytes(pdf_bytes)
@@ -87,6 +88,7 @@ async def _run_pipeline(state: ARIAState) -> None:
                     "type": "completed",
                     "etape": "rapport",
                     "rapport_url": f"/api/sessions/{session_id}/report",
+                    "key_frames": key_frames_snapshot,
                 },
             )
     except Exception as exc:
@@ -230,4 +232,5 @@ async def get_session(session_id: str) -> dict:
         "diagnostic": state["diagnostic"].model_dump() if state["diagnostic"] else None,
         "rag_refs": state["rag_refs"],
         "report": state["report"],
+        "key_frames": state.get("key_frames") or [],
     }

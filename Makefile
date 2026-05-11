@@ -1,4 +1,6 @@
-.PHONY: help fetch-corpus index-corpus build-corpus serve debug health test-link test test-video \
+.PHONY: help fetch-corpus index-corpus build-corpus \
+        build-protocols \
+        serve debug health test-link test test-video \
         test-diagnosis test-rag test-report test-graph lint format install download-model visualize \
         docs docs-serve clean docker-build docker-up docker-down docker-logs docker-debug
 
@@ -25,7 +27,10 @@ fetch-corpus: ## Télécharge les abstracts PubMed (NCBI Entrez → data/corpus/
 index-corpus: ## Indexe data/corpus/*.json dans ChromaDB (embeddings e5-multilingual)
 	uv run python scripts/aria_index_corpus.py
 
-build-corpus: fetch-corpus index-corpus ## Télécharge ET indexe le corpus en une commande
+build-corpus: fetch-corpus index-corpus ## Télécharge ET indexe le corpus PubMed en une commande
+
+build-protocols: ## Indexe les protocoles de rééducation dans ChromaDB (collection aria_protocols)
+	uv run python scripts/build_protocol_corpus.py
 
 # ── Santé ────────────────────────────────────────────────────────────────────
 health: ## Vérifie la santé du middleware (port 8000) et du back LLM
@@ -42,10 +47,10 @@ test-link: ## Envoie le payload tests/fixtures/test_llm_payload.json au back LLM
 
 # ── Serveur ──────────────────────────────────────────────────────────────────
 serve: ## Lance le serveur FastAPI en mode rechargement (port 8000)
-	uv run uvicorn main:app --reload --port 8000
+	uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 debug: ## Lance le serveur en mode debug (LOG_LEVEL=DEBUG + tracebacks complets)
-	LOG_LEVEL=DEBUG uv run uvicorn main:app --reload --port 8000 --log-level debug
+	LOG_LEVEL=DEBUG uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000 --log-level debug
 
 docker-build: ## Construit l'image Docker aria_middle
 	docker compose build
@@ -94,9 +99,8 @@ format: ## Vérification stricte sans correction (CI)
 install: ## Installe toutes les dépendances (uv sync)
 	uv sync --all-groups
 
-download-model: ## Télécharge le modèle MediaPipe PoseLandmarker
-	mkdir -p models
-	curl -L -o models/pose_landmarker_full.task \
+download-model: ## Télécharge le modèle MediaPipe PoseLandmarker (racine du projet)
+	curl -L -o pose_landmarker_full.task \
 	  https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task
 
 # ── Visualisation ────────────────────────────────────────────────────────────

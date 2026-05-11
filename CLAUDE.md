@@ -8,7 +8,7 @@
 ## 1. Rôle de ce projet
 
 `aria_middle` est la couche de contrôle et d'orchestration du système ARIA.
-Il tourne sur le **Mac M3** (port 8000) et fait le lien entre :
+Il tourne sur **Linux** (port 8000) et fait le lien entre :
 
 - `aria-frontend` (Vue.js, port 5173) — via REST + WebSocket
 - `aria_llm` (vLLM sur RTX 4060 Ti, port 8001) — via HTTP REST
@@ -108,7 +108,7 @@ class ARIAState(TypedDict):
   - `RIGHT_*` symétriques (24, 26, 28, 30, 32)
   - `LEFT_SHOULDER` (11) pour l'inclinaison tronc
 - **Seuil de confiance** : `min_detection_confidence=0.7`, `min_tracking_confidence=0.5`
-- **Backend Apple Silicon** : MediaPipe utilise Metal automatiquement sur M3
+- **Backend** : MediaPipe utilise le CPU sur Linux (pas d'accélération GPU pour cette couche)
 
 ---
 
@@ -220,7 +220,7 @@ LOG_LEVEL=INFO
 | Étape | Budget | Bloquant |
 |---|---|---|
 | Extraction frames (2 min @ 50fps) | ≤ 5s | Non |
-| MediaPipe Pose (6000 frames) | ≤ 15s sur M3 MPS | Oui |
+| MediaPipe Pose (6000 frames) | ≤ 30s sur Linux CPU | Oui |
 | Calcul métriques | ≤ 2s | Non |
 | RAG ChromaDB top-5 | ≤ 3s | Non |
 | Inférence ARIA-ft vLLM | ≤ 20s | Oui |

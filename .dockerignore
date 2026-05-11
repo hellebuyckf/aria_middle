@@ -5,6 +5,7 @@ __pycache__
 .pytest_cache
 .ruff_cache
 data/sessions
+data/corpus
 data/video
 *.mp4
 output_pose.mp4

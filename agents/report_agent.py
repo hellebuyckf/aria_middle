@@ -53,13 +53,20 @@ def _is_abnormal(field: str, value: float) -> bool:
 
 
 def _compute_abnormal_metrics(
-    metrics: BiomechanicalMetrics, pathologie: str
+    metrics: BiomechanicalMetrics,
+    pathologie: str,  # noqa: ARG001
 ) -> list[str]:
-    """Retourne les noms des métriques hors norme, filtrées par pathologie."""
+    """Retourne tous les champs hors norme (sagittaux + postérieurs).
+
+    Non filtrés par pathologie : aligne le comportement avec le PDF et permet
+    à l'UI d'afficher correctement les points rouges sur toutes les métriques.
+    """
+    data = metrics.model_dump()
     return [
         field
-        for field, value in _relevant_metrics(metrics, pathologie).items()
-        if isinstance(value, (int, float)) and _is_abnormal(field, float(value))
+        for field, (lo, hi) in _THRESHOLDS.items()
+        if isinstance(data.get(field), (int, float))
+        and _is_abnormal(field, float(data[field]))
     ]
 
 
@@ -81,6 +88,7 @@ def _build_prompt(state: ARIAState) -> str:
     metrics: BiomechanicalMetrics | None = state["metrics"]
     refs = state["rag_refs"]
     pathologie = diagnostic.pathologie if diagnostic else ""
+    profil_chaussure = state.get("profil_chaussure")
 
     lines: list[str] = [
         "Tu es ARIA-ft, assistant clinique spécialisé en biomécanique de la course.",
@@ -99,10 +107,35 @@ def _build_prompt(state: ARIAState) -> str:
             field_info = BiomechanicalMetrics.model_fields[field_name]
             lines.append(f'- "{field_name}": {value}  # {field_info.description or ""}')
 
+    if profil_chaussure:
+        lines += ["", "## Chaussures actuelles du coureur"]
+        if profil_chaussure.get("marque") or profil_chaussure.get("modele"):
+            lines.append(
+                f"- Modèle : {profil_chaussure.get('marque', '')} {profil_chaussure.get('modele', '')}".strip()
+            )
+        if "drop_mm" in profil_chaussure:
+            lines.append(f"- Drop actuel : {profil_chaussure['drop_mm']} mm")
+        if profil_chaussure.get("stabilite"):
+            lines.append(f"- Stabilité : {profil_chaussure.get('stabilite')}")
+        if profil_chaussure.get("amorti"):
+            lines.append(f"- Amorti : {profil_chaussure.get('amorti')}")
+        if profil_chaussure.get("poids_type"):
+            lines.append(f"- Poids : {profil_chaussure.get('poids_type')}")
+        if profil_chaussure.get("dynamisme"):
+            lines.append(f"- Dynamisme : {profil_chaussure.get('dynamisme')}")
+
     lines += ["", "## Références PubMed (top-5)"]
     for ref in refs[:5]:
         lines.append(f"- Titre : {ref['titre']}")
         lines.append(f"  Extrait : {ref['extrait']}")
+
+    chaussure_consigne = (
+        " Inclure obligatoirement une recommandation sur les chaussures : "
+        "évaluer si le drop actuel est adapté à la pathologie et aux métriques, "
+        "et préciser le drop cible recommandé (en mm) avec justification biomécanique."
+        if profil_chaussure and "drop_mm" in profil_chaussure
+        else " Si pertinent, inclure une recommandation sur le type de chaussures adapté."
+    )
 
     lines += [
         "",
@@ -110,7 +143,7 @@ def _build_prompt(state: ARIAState) -> str:
         "Le diagnostic et la confiance sont FIXÉS ci-dessus — ne les modifie pas.",
         "Retourne UNIQUEMENT un objet JSON valide avec exactement ces champs :",
         '- "justification_diagnostic": string — justification clinique détaillée',
-        '- "recommandations": array of strings — protocole de rééducation personnalisé',
+        f'- "recommandations": array of strings — protocole de rééducation personnalisé.{chaussure_consigne}',
         '- "references_pubmed": array of strings — titres des références utilisées',
         '- "avertissement": string — invitation au praticien à confirmer le diagnostic',
     ]
@@ -155,6 +188,10 @@ async def report_agent(state: ARIAState) -> dict:
             ticker.cancel()
 
         data = json.loads(raw_json)
+        required = {"justification_diagnostic", "recommandations", "references_pubmed"}
+        missing = required - data.keys()
+        if missing:
+            raise ValueError(f"Champs manquants dans la réponse LLM : {missing}")
         data["session_id"] = session_id
         data["patient_id"] = state["patient_id"]
         data["date_generation"] = date.today().isoformat()
