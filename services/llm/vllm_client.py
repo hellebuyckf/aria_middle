@@ -1,4 +1,8 @@
 from openai import AsyncOpenAI
+from openai.types.shared_params import (
+    ResponseFormatJSONObject,
+    ResponseFormatJSONSchema,
+)
 
 from core.config import settings
 from models.diagnostic import DiagnosticLLM
@@ -28,14 +32,14 @@ async def generate_report(
     patient_id: str,
     response_format: dict | None = None,
 ) -> str:
-    rf: dict = (
-        {
+    rf: ResponseFormatJSONObject | ResponseFormatJSONSchema
+    if response_format is not None:
+        rf = {
             "type": "json_schema",
             "json_schema": {"name": "aria_report", "schema": response_format},
         }
-        if response_format is not None
-        else {"type": "json_object"}
-    )
+    else:
+        rf = {"type": "json_object"}
     response = await _client.chat.completions.create(
         model="aria-ft",
         messages=[{"role": "user", "content": prompt}],
