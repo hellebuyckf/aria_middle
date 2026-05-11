@@ -72,9 +72,7 @@ def _build_html(state: ARIAState) -> str:
     km_semaine: int | None = state.get("km_semaine")  # type: ignore[call-overload]
     niveau_pratique: str | None = state.get("niveau_pratique")  # type: ignore[call-overload]
     imc: float | None = (
-        round(poids_kg / (taille_cm / 100) ** 2, 1)
-        if poids_kg and taille_cm
-        else None
+        round(poids_kg / (taille_cm / 100) ** 2, 1) if poids_kg and taille_cm else None
     )
 
     rows_sag = []

@@ -53,7 +53,8 @@ def _is_abnormal(field: str, value: float) -> bool:
 
 
 def _compute_abnormal_metrics(
-    metrics: BiomechanicalMetrics, pathologie: str  # noqa: ARG001
+    metrics: BiomechanicalMetrics,
+    pathologie: str,  # noqa: ARG001
 ) -> list[str]:
     """Retourne tous les champs hors norme (sagittaux + postérieurs).
 
@@ -110,18 +111,18 @@ def _build_prompt(state: ARIAState) -> str:
         lines += ["", "## Chaussures actuelles du coureur"]
         if profil_chaussure.get("marque") or profil_chaussure.get("modele"):
             lines.append(
-                f'- Modèle : {profil_chaussure.get("marque", "")} {profil_chaussure.get("modele", "")}'.strip()
+                f"- Modèle : {profil_chaussure.get('marque', '')} {profil_chaussure.get('modele', '')}".strip()
             )
         if "drop_mm" in profil_chaussure:
-            lines.append(f'- Drop actuel : {profil_chaussure["drop_mm"]} mm')
+            lines.append(f"- Drop actuel : {profil_chaussure['drop_mm']} mm")
         if profil_chaussure.get("stabilite"):
-            lines.append(f'- Stabilité : {profil_chaussure["stabilite"]}')
+            lines.append(f"- Stabilité : {profil_chaussure['stabilite']}")
         if profil_chaussure.get("amorti"):
-            lines.append(f'- Amorti : {profil_chaussure["amorti"]}')
+            lines.append(f"- Amorti : {profil_chaussure['amorti']}")
         if profil_chaussure.get("poids_type"):
-            lines.append(f'- Poids : {profil_chaussure["poids_type"]}')
+            lines.append(f"- Poids : {profil_chaussure['poids_type']}")
         if profil_chaussure.get("dynamisme"):
-            lines.append(f'- Dynamisme : {profil_chaussure["dynamisme"]}')
+            lines.append(f"- Dynamisme : {profil_chaussure['dynamisme']}")
 
     lines += ["", "## Références PubMed (top-5)"]
     for ref in refs[:5]:
