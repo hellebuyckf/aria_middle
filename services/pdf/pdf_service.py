@@ -1,4 +1,3 @@
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -30,9 +29,6 @@ _METRICS_POSTERIOR: list[tuple[str, str, str, str]] = [
     ("oscillation_laterale_hanche", "Oscillation latérale hanche", "cm", "< 3"),
     ("pronation_pied", "Pronation pied", "°", "< 8"),
 ]
-
-# Sur macOS (Apple Silicon), WeasyPrint/cffi ne trouve pas libgobject via dlopen sans ce path.
-_MACOS_BREW_LIB = "/opt/homebrew/lib"
 
 
 def _fmt(value: float | None, unit: str) -> str:
@@ -68,6 +64,18 @@ def _is_abnormal(field: str, value: float | None) -> bool:
 def _build_html(state: ARIAState) -> str:
     report: ARIAReport = state["report"]  # type: ignore[assignment]
     metrics: BiomechanicalMetrics | None = state["metrics"]
+    pathologie_declaree: str | None = state.get("pathologie_declaree")  # type: ignore[call-overload]
+    profil_chaussure = state.get("profil_chaussure")  # type: ignore[call-overload]
+    age: int | None = state.get("age")  # type: ignore[call-overload]
+    taille_cm: int | None = state.get("taille_cm")  # type: ignore[call-overload]
+    poids_kg: float | None = state.get("poids_kg")  # type: ignore[call-overload]
+    km_semaine: int | None = state.get("km_semaine")  # type: ignore[call-overload]
+    niveau_pratique: str | None = state.get("niveau_pratique")  # type: ignore[call-overload]
+    imc: float | None = (
+        round(poids_kg / (taille_cm / 100) ** 2, 1)
+        if poids_kg and taille_cm
+        else None
+    )
 
     rows_sag = []
     rows_post = []
@@ -101,22 +109,19 @@ def _build_html(state: ARIAState) -> str:
         rows_sag=rows_sag,
         rows_post=rows_post,
         key_frames=key_frames,
+        pathologie_declaree=pathologie_declaree,
+        profil_chaussure=profil_chaussure,
+        age=age,
+        taille_cm=taille_cm,
+        poids_kg=poids_kg,
+        km_semaine=km_semaine,
+        niveau_pratique=niveau_pratique,
+        imc=imc,
     )
 
 
 def render_pdf(state: ARIAState) -> bytes:
     html = _build_html(state)
-
-    # WeasyPrint est lancé dans un subprocess avec DYLD_LIBRARY_PATH injecté
-    # pour que cffi/pango trouvent les libs Homebrew sur macOS Apple Silicon.
-    env = dict(os.environ)
-    if sys.platform == "darwin" and _MACOS_BREW_LIB not in env.get(
-        "DYLD_LIBRARY_PATH", ""
-    ):
-        env["DYLD_LIBRARY_PATH"] = (
-            _MACOS_BREW_LIB + ":" + env.get("DYLD_LIBRARY_PATH", "")
-        )
-
     result = subprocess.run(
         [
             sys.executable,
@@ -125,7 +130,6 @@ def render_pdf(state: ARIAState) -> bytes:
         ],
         input=html.encode(),
         capture_output=True,
-        env=env,
         check=True,
     )
     return result.stdout

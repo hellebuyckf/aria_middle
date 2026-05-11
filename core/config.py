@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     """Configuration ARIA chargée depuis .env ou les variables d'environnement."""
 
     MEDIAPIPE_MODEL_PATH: str = Field(
-        default="models/pose_landmarker_full.task",
+        default="pose_landmarker_full.task",
         description="Chemin vers le fichier modèle MediaPipe PoseLandmarker (.task).",
     )
     VLLM_BASE_URL: str = Field(

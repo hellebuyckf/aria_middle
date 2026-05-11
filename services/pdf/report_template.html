@@ -57,6 +57,15 @@
   .frame-cell { width: 50%; padding: 4px; vertical-align: top; }
   .frame-cell img { width: 100%; border: 1px solid #c8d8f5; border-radius: 3px; display: block; }
 
+  /* ── Profil & Équipement ── */
+  .profil-grid { display: flex; gap: 12px; }
+  .profil-col { flex: 1; background: #f4f7fd; border: 1px solid #c8d8f5; border-radius: 5px; padding: 9px 12px; font-size: 9pt; }
+  .profil-col h3 { font-size: 8.5pt; font-weight: 700; color: #1b4fac; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 6px; }
+  .profil-row { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #e8eef8; }
+  .profil-row:last-child { border-bottom: none; }
+  .profil-label { color: #555; }
+  .profil-val { font-weight: 600; color: #1a1a1a; }
+
   /* ── Warning ── */
   .warning { margin-top: 20px; border: 1px solid #d1d5db; border-radius: 4px; padding: 8px 12px; font-size: 8pt; color: #666; background: #f9fafb; }
   .warning strong { color: #374151; }
@@ -94,6 +103,52 @@
     {% endif %}
   </div>
 </div>
+
+<!-- PROFIL & ÉQUIPEMENT -->
+{% set has_profil = age or taille_cm or poids_kg or km_semaine or niveau_pratique %}
+{% if has_profil or profil_chaussure %}
+<h2>Profil &amp; Équipement</h2>
+<div class="profil-grid">
+
+  {% if has_profil %}
+  <div class="profil-col">
+    <h3>Coureur</h3>
+    {% if age %}<div class="profil-row"><span class="profil-label">Âge</span><span class="profil-val">{{ age }} ans</span></div>{% endif %}
+    {% if taille_cm %}<div class="profil-row"><span class="profil-label">Taille</span><span class="profil-val">{{ taille_cm }} cm</span></div>{% endif %}
+    {% if poids_kg %}<div class="profil-row"><span class="profil-label">Poids</span><span class="profil-val">{{ poids_kg }} kg</span></div>{% endif %}
+    {% if imc %}<div class="profil-row"><span class="profil-label">IMC</span><span class="profil-val">{{ imc }}</span></div>{% endif %}
+    {% if km_semaine %}<div class="profil-row"><span class="profil-label">Volume hebdo</span><span class="profil-val">{{ km_semaine }} km/sem.</span></div>{% endif %}
+    {% if niveau_pratique %}<div class="profil-row"><span class="profil-label">Niveau</span><span class="profil-val">{{ niveau_pratique }}</span></div>{% endif %}
+    {% if pathologie_declaree %}<div class="profil-row"><span class="profil-label">Pathologie déclarée</span><span class="profil-val">{{ pathologie_declaree }}</span></div>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if profil_chaussure %}
+  <div class="profil-col">
+    <h3>Chaussures</h3>
+    {% if profil_chaussure.marque or profil_chaussure.modele %}
+    <div class="profil-row"><span class="profil-label">Modèle</span><span class="profil-val">{{ profil_chaussure.marque or '' }} {{ profil_chaussure.modele or '' }}</span></div>
+    {% endif %}
+    {% if profil_chaussure.drop_mm is not none %}
+    <div class="profil-row"><span class="profil-label">Drop</span><span class="profil-val">{{ profil_chaussure.drop_mm }} mm</span></div>
+    {% endif %}
+    {% if profil_chaussure.stabilite %}
+    <div class="profil-row"><span class="profil-label">Stabilité</span><span class="profil-val">{{ profil_chaussure.stabilite }}</span></div>
+    {% endif %}
+    {% if profil_chaussure.amorti %}
+    <div class="profil-row"><span class="profil-label">Amorti</span><span class="profil-val">{{ profil_chaussure.amorti }}</span></div>
+    {% endif %}
+    {% if profil_chaussure.poids_type %}
+    <div class="profil-row"><span class="profil-label">Poids</span><span class="profil-val">{{ profil_chaussure.poids_type }}</span></div>
+    {% endif %}
+    {% if profil_chaussure.dynamisme %}
+    <div class="profil-row"><span class="profil-label">Dynamisme</span><span class="profil-val">{{ profil_chaussure.dynamisme }}</span></div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}
 
 <!-- MÉTRIQUES SAGITTALES -->
 {% if rows_sag %}

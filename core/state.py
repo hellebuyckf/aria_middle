@@ -19,6 +19,8 @@ class ProfilChaussure(TypedDict, total=False):
     drop_mm: int
     stabilite: str
     amorti: str
+    poids_type: str
+    dynamisme: str
 
 
 class ARIAState(TypedDict):

@@ -28,10 +28,18 @@ async def generate_report(
     patient_id: str,
     response_format: dict | None = None,
 ) -> str:
+    rf: dict = (
+        {
+            "type": "json_schema",
+            "json_schema": {"name": "aria_report", "schema": response_format},
+        }
+        if response_format is not None
+        else {"type": "json_object"}
+    )
     response = await _client.chat.completions.create(
         model="aria-ft",
         messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
+        response_format=rf,
         timeout=30,
     )
     raw = response.choices[0].message.content

@@ -61,9 +61,11 @@ def _section_profil_chaussure(profil: ProfilChaussure | None) -> list[str]:
     champs = [
         ("Marque", profil.get("marque")),
         ("Modèle", profil.get("modele")),
-        ("Drop", f"{profil['drop_mm']} mm" if "drop_mm" in profil else None),
+        ("Drop actuel", f"{profil['drop_mm']} mm" if "drop_mm" in profil else None),
         ("Stabilité", profil.get("stabilite")),
         ("Amorti", profil.get("amorti")),
+        ("Poids", profil.get("poids_type")),
+        ("Dynamisme", profil.get("dynamisme")),
     ]
     lignes = [f"- {label} : {valeur}" for label, valeur in champs if valeur is not None]
     if not lignes:
