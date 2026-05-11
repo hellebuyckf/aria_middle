@@ -25,9 +25,8 @@ def _get_queue(session_id: str) -> asyncio.Queue:
 
 
 def reset_session(session_id: str) -> None:
-    """Purge queue et cache terminal — à appeler au démarrage de chaque pipeline."""
+    """Purge le cache terminal — à appeler au démarrage de chaque pipeline."""
     _terminal_cache.pop(session_id, None)
-    queues.pop(session_id, None)
 
 
 async def broadcast(session_id: str, event: dict) -> None:
