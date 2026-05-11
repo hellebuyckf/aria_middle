@@ -10,7 +10,7 @@ from fastapi.params import File, Form
 from fastapi.responses import Response
 from loguru import logger
 
-from api.websocket import broadcast
+from api.websocket import broadcast, reset_session
 import core.events as events
 from core.config import settings
 from core.graph import run_analysis, run_report
@@ -31,6 +31,7 @@ async def _save_upload(upload: UploadFile, dest: Path) -> None:
 async def _run_pipeline(state: ARIAState) -> None:
     """Lance le pipeline complet : analyse vidéo → diagnostic → RAG → rapport."""
     session_id = state["session_id"]
+    reset_session(session_id)
     events.register(session_id, lambda evt: broadcast(session_id, evt))
     await broadcast(
         session_id,
