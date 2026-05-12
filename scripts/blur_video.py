@@ -20,25 +20,30 @@ _PROFILE: cv2.CascadeClassifier = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_profileface.xml"  # type: ignore[attr-defined]
 )
 
-# Marge ajoutée autour de la bbox mémorisée (% de la largeur du visage).
-# Compense les légers déplacements pendant les frames sans détection.
-_PADDING = 0.20
+# Marge autour de la bbox détectée (% de la largeur du visage détecté).
+_PADDING = 0.10
+
+# Taille max de la zone floutée, exprimée en fraction de la hauteur de frame.
+# Une tête humaine occupe rarement plus de 25 % de la hauteur sur une vue sagittale.
+# Au-delà → fausse détection (main, bras…) → bbox rejetée, on garde la précédente.
+_MAX_HEAD_RATIO = 0.25
 
 
 class _FaceTracker:
-    """Maintient la dernière bbox détectée pour combler les gaps de détection.
+    """Maintient la dernière bbox valide pour combler les gaps de détection.
 
     Quand la cascade échoue (main devant le visage, flou de mouvement…),
     on continue à flouter la zone mémorisée pendant `ttl` frames.
+    Une bbox dont la hauteur dépasse _MAX_HEAD_RATIO * frame_h est considérée
+    comme une anomalie (fausse détection) et ne met pas à jour le tracker.
     """
 
     def __init__(self, ttl: int) -> None:
         self._ttl = ttl
         self._bbox: tuple[int, int, int, int] | None = None  # (x, y, w, h) paddée
-        self._age = 0  # frames écoulées depuis la dernière détection réelle
+        self._age = 0  # frames depuis la dernière détection valide
 
-    def detect(self, gray: np.ndarray) -> list[tuple[int, int, int, int]]:
-        """Retourne la liste de bboxes (x, y, w, h) pour cette frame."""
+    def _raw_detections(self, gray: np.ndarray) -> list[tuple[int, int, int, int]]:
         found: list[tuple[int, int, int, int]] = []
         for cascade in (_FRONTAL, _PROFILE):
             faces = cascade.detectMultiScale(
@@ -52,30 +57,38 @@ class _FaceTracker:
         self, gray: np.ndarray, frame_h: int, frame_w: int
     ) -> list[tuple[int, int, int, int]]:
         """Détecte les visages et retourne les bboxes à flouter (avec persistance)."""
-        detected = self.detect(gray)
+        detected = self._raw_detections(gray)
 
         if detected:
-            # Fusionne toutes les détections en une seule bbox englobante paddée
+            # Bbox englobante de toutes les détections
             xs = [x for x, _, _, _ in detected]
             ys = [y for _, y, _, _ in detected]
             x2s = [x + fw for x, _, fw, _ in detected]
             y2s = [y + fh for _, y, _, fh in detected]
             x, y, x2, y2 = min(xs), min(ys), max(x2s), max(y2s)
             fw, fh = x2 - x, y2 - y
+
+            # Rejet si la bbox est anormalement grande (fausse détection)
+            if fh > _MAX_HEAD_RATIO * frame_h or fw > _MAX_HEAD_RATIO * frame_w:
+                # On garde silencieusement la bbox précédente si elle existe
+                if self._bbox is not None and self._age < self._ttl:
+                    self._age += 1
+                    return [self._bbox]
+                return []
+
             pad_x = int(fw * _PADDING)
             pad_y = int(fh * _PADDING)
-            self._bbox = (
-                max(0, x - pad_x),
-                max(0, y - pad_y),
-                min(frame_w, x2 + pad_x) - max(0, x - pad_x),
-                min(frame_h, y2 + pad_y) - max(0, y - pad_y),
-            )
+            bx = max(0, x - pad_x)
+            by = max(0, y - pad_y)
+            bw = min(frame_w, x2 + pad_x) - bx
+            bh = min(frame_h, y2 + pad_y) - by
+            self._bbox = (bx, by, bw, bh)
             self._age = 0
             return [self._bbox]
 
         if self._bbox is not None and self._age < self._ttl:
             self._age += 1
-            return [self._bbox]  # persistance : même zone, détection absente
+            return [self._bbox]
 
         self._bbox = None
         return []
