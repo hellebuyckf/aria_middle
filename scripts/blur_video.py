@@ -22,7 +22,7 @@ import numpy as np
 _HEAD_LM_INDICES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]  # nez, yeux, oreilles, bouche
 
 # Marge autour de la bbox calculée depuis les landmarks (% des dimensions)
-_PADDING = 0.30
+_PADDING = 0.45
 
 # Modèle par défaut : racine du projet (répertoire parent de scripts/)
 _DEFAULT_MODEL = str(pathlib.Path(__file__).parents[1] / "pose_landmarker_full.task")
