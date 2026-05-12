@@ -2,7 +2,7 @@
 
 Usage :
     uv run python scripts/blur_video.py INPUT OUTPUT
-    uv run python scripts/blur_video.py INPUT OUTPUT --codec mp4v
+    uv run python scripts/blur_video.py INPUT OUTPUT --codec mp4v --ttl 20
 
 Indépendant du serveur — aucune dépendance projet, uniquement OpenCV.
 """
@@ -20,25 +20,84 @@ _PROFILE: cv2.CascadeClassifier = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_profileface.xml"  # type: ignore[attr-defined]
 )
 
+# Marge ajoutée autour de la bbox mémorisée (% de la largeur du visage).
+# Compense les légers déplacements pendant les frames sans détection.
+_PADDING = 0.20
 
-def _blur_faces(frame: np.ndarray) -> np.ndarray:
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    out = frame.copy()
-    blurred = False
-    for cascade in (_FRONTAL, _PROFILE):
-        faces = cascade.detectMultiScale(
-            gray, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30)
-        )
-        for x, y, fw, fh in faces:
-            k = max(51, fw | 1)
-            out[y : y + fh, x : x + fw] = cv2.GaussianBlur(
-                out[y : y + fh, x : x + fw], (k, k), 0
+
+class _FaceTracker:
+    """Maintient la dernière bbox détectée pour combler les gaps de détection.
+
+    Quand la cascade échoue (main devant le visage, flou de mouvement…),
+    on continue à flouter la zone mémorisée pendant `ttl` frames.
+    """
+
+    def __init__(self, ttl: int) -> None:
+        self._ttl = ttl
+        self._bbox: tuple[int, int, int, int] | None = None  # (x, y, w, h) paddée
+        self._age = 0  # frames écoulées depuis la dernière détection réelle
+
+    def detect(self, gray: np.ndarray) -> list[tuple[int, int, int, int]]:
+        """Retourne la liste de bboxes (x, y, w, h) pour cette frame."""
+        found: list[tuple[int, int, int, int]] = []
+        for cascade in (_FRONTAL, _PROFILE):
+            faces = cascade.detectMultiScale(
+                gray, scaleFactor=1.1, minNeighbors=4, minSize=(30, 30)
             )
-            blurred = True
-    return out if blurred else frame
+            for x, y, fw, fh in faces:
+                found.append((int(x), int(y), int(fw), int(fh)))
+        return found
+
+    def update(
+        self, gray: np.ndarray, frame_h: int, frame_w: int
+    ) -> list[tuple[int, int, int, int]]:
+        """Détecte les visages et retourne les bboxes à flouter (avec persistance)."""
+        detected = self.detect(gray)
+
+        if detected:
+            # Fusionne toutes les détections en une seule bbox englobante paddée
+            xs = [x for x, _, _, _ in detected]
+            ys = [y for _, y, _, _ in detected]
+            x2s = [x + fw for x, _, fw, _ in detected]
+            y2s = [y + fh for _, y, _, fh in detected]
+            x, y, x2, y2 = min(xs), min(ys), max(x2s), max(y2s)
+            fw, fh = x2 - x, y2 - y
+            pad_x = int(fw * _PADDING)
+            pad_y = int(fh * _PADDING)
+            self._bbox = (
+                max(0, x - pad_x),
+                max(0, y - pad_y),
+                min(frame_w, x2 + pad_x) - max(0, x - pad_x),
+                min(frame_h, y2 + pad_y) - max(0, y - pad_y),
+            )
+            self._age = 0
+            return [self._bbox]
+
+        if self._bbox is not None and self._age < self._ttl:
+            self._age += 1
+            return [self._bbox]  # persistance : même zone, détection absente
+
+        self._bbox = None
+        return []
 
 
-def blur_video(input_path: str, output_path: str, codec: str = "mp4v") -> None:
+def _apply_blur(
+    frame: np.ndarray, bboxes: list[tuple[int, int, int, int]]
+) -> np.ndarray:
+    if not bboxes:
+        return frame
+    out = frame.copy()
+    for x, y, fw, fh in bboxes:
+        k = max(51, fw | 1)
+        out[y : y + fh, x : x + fw] = cv2.GaussianBlur(
+            out[y : y + fh, x : x + fw], (k, k), 0
+        )
+    return out
+
+
+def blur_video(
+    input_path: str, output_path: str, codec: str = "mp4v", ttl: int = 15
+) -> None:
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
         sys.exit(f"Erreur : impossible d'ouvrir '{input_path}'")
@@ -49,36 +108,40 @@ def blur_video(input_path: str, output_path: str, codec: str = "mp4v") -> None:
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     fourcc = cv2.VideoWriter_fourcc(*codec)
-    out = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
-    if not out.isOpened():
+    writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+    if not writer.isOpened():
         cap.release()
         sys.exit(f"Erreur : impossible d'écrire '{output_path}' (codec {codec})")
 
     print(f"Floutage visages : {input_path}  →  {output_path}")
-    print(f"  {w}×{h} @ {fps:.1f} fps  |  {total} frames")
+    print(f"  {w}×{h} @ {fps:.1f} fps  |  {total} frames  |  TTL persistance : {ttl}")
 
+    tracker = _FaceTracker(ttl)
     n = 0
-    faces_total = 0
+    blurred_count = 0
+
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-        blurred = _blur_faces(frame)
-        if blurred is not frame:
-            faces_total += 1
-        out.write(blurred)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        bboxes = tracker.update(gray, h, w)
+        out = _apply_blur(frame, bboxes)
+        if bboxes:
+            blurred_count += 1
+        writer.write(out)
         n += 1
         if n % 50 == 0 or n == total:
             pct = n / total * 100 if total else 0
             print(
-                f"\r  {n}/{total} frames ({pct:.0f}%) — visages floutés : {faces_total}",
+                f"\r  {n}/{total} frames ({pct:.0f}%) — floutées : {blurred_count}",
                 end="",
                 flush=True,
             )
 
     cap.release()
-    out.release()
-    print(f"\nTerminé. {faces_total}/{n} frames avec visage flouté → {output_path}")
+    writer.release()
+    print(f"\nTerminé. {blurred_count}/{n} frames floutées → {output_path}")
 
 
 def main() -> None:
@@ -92,8 +155,14 @@ def main() -> None:
         default="mp4v",
         help="Codec FourCC (défaut : mp4v). Alternatives : avc1, XVID",
     )
+    parser.add_argument(
+        "--ttl",
+        type=int,
+        default=15,
+        help="Frames de persistance après perte de détection (défaut : 15 ≈ 0.6s à 25fps)",
+    )
     args = parser.parse_args()
-    blur_video(args.input, args.output, args.codec)
+    blur_video(args.input, args.output, args.codec, args.ttl)
 
 
 if __name__ == "__main__":
