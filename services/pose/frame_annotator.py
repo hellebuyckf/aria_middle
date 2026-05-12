@@ -275,13 +275,16 @@ def select_key_frames(
     result: list[str] = []
     ic_cursor = 0
     for m in sorted_metrics:
-        if len(result) == 4:
+        if len(result) == 6:
             break
         if m in _IC_METRICS:
-            if not ic_pool:
+            if ic_pool:
+                valid_idx = ic_pool[ic_cursor % len(ic_pool)]
+                ic_cursor += 1
+            elif _is_abnormal(m, metric_vals[m]):
+                valid_idx = median_idx  # fallback : anormal sans IC → frame médiane
+            else:
                 continue
-            valid_idx = ic_pool[ic_cursor % len(ic_pool)]
-            ic_cursor += 1
         else:
             valid_idx = median_idx
         pose = valid_poses[valid_idx]
