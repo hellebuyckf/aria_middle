@@ -2,7 +2,7 @@
 
 Couche middleware du système **ARIA** — orchestration FastAPI + LangGraph pour l'analyse biomécanique de la course à pied.
 
-Tourne sur Mac M3 (port 8000). Ne fait aucune inférence LLM locale.
+Tourne sur alpha-server (Linux, port 8000). Ne fait aucune inférence LLM locale.
 
 ---
 
@@ -32,9 +32,9 @@ Tourne sur Mac M3 (port 8000). Ne fait aucune inférence LLM locale.
                                                                               │ HTTP (OpenAI-compatible)
                                                                               ▼
                                                          ┌──────────────────────────────────────────────────────┐
-                                                         │                   aria_llm                           │
+                                                         │                   aria_back                          │
                                                          │                   vLLM + ARIA-ft                     │
-                                                         │                   PC RTX 4060 Ti — port 8001          │
+                                                         │                   alpha-server — port 8001            │
                                                          └──────────────────────────────────────────────────────┘
 ```
 
@@ -71,7 +71,7 @@ uv run uvicorn main:app --reload --port 8000
 Créer un fichier `.env` à la racine :
 
 ```env
-VLLM_BASE_URL=http://192.168.x.x:8001/v1
+VLLM_BASE_URL=http://aria_back:8001/v1
 CHROMADB_PATH=./data/corpus
 SESSIONS_DIR=./data/sessions
 MAX_VIDEO_SIZE_GB=2
