@@ -282,7 +282,9 @@ def render_key_frames(
 ) -> list[str]:
     """Annote et encode en base64 les frames sélectionnées par plan_key_frames."""
     valid_poses: list[PoseLandmarks] = [pl for pl in raw_sag if pl is not None]
-    poses_by_frame: dict[int, PoseLandmarks] = {pl.frame_index: pl for pl in valid_poses}
+    poses_by_frame: dict[int, PoseLandmarks] = {
+        pl.frame_index: pl for pl in valid_poses
+    }
     metric_vals = {f: getattr(metrics, f, None) for f in _PRIORITY}
 
     result: list[str] = []
@@ -291,7 +293,9 @@ def render_key_frames(
         pose = poses_by_frame.get(frame_index)
         if frame is None or pose is None:
             continue
-        result.append(_to_b64(annotate_frame(frame, pose.landmarks, m, metric_vals.get(m))))
+        result.append(
+            _to_b64(annotate_frame(frame, pose.landmarks, m, metric_vals.get(m)))
+        )
 
     return result
 

@@ -138,7 +138,10 @@ async def video_agent(state: ARIAState) -> ARIAState:
             None, partial(extract_specific_frames, video_path, needed_indices, 25)
         )
         key_frames = await loop.run_in_executor(
-            None, partial(render_key_frames, frames_for_annotation, kf_plan, raw_sag, metrics)
+            None,
+            partial(
+                render_key_frames, frames_for_annotation, kf_plan, raw_sag, metrics
+            ),
         )
         logger.info(f"[{session_id}] {len(key_frames)} capture(s) clé(s) générée(s)")
         del frames_for_annotation

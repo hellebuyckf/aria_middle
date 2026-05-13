@@ -43,7 +43,10 @@ async def ws_session(websocket: WebSocket, session_id: str) -> None:
     # Reconnexion après fin de session : rejouer l'événement terminal immédiatement
     # pour que le client sache s'arrêter sans épuiser ses tentatives.
     if session_id in _terminal_cache:
-        logger.info("[{}] WebSocket reconnecté sur session terminée — replay terminal", session_id)
+        logger.info(
+            "[{}] WebSocket reconnecté sur session terminée — replay terminal",
+            session_id,
+        )
         await websocket.send_text(json.dumps(_terminal_cache[session_id]))
         await asyncio.sleep(_CLOSE_GRACE_S)
         await websocket.close()

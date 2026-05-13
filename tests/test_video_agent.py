@@ -61,16 +61,19 @@ def session_state() -> ARIAState:
 
 
 @patch("agents.video_agent.os.path.exists", return_value=True)
+@patch("agents.video_agent.render_key_frames", return_value=[])
+@patch("agents.video_agent.extract_specific_frames", return_value={})
+@patch("agents.video_agent.plan_key_frames", return_value=[])
 @patch("agents.video_agent.calculate_metrics")
-@patch("agents.video_agent.detect_pose")
-@patch("agents.video_agent.extract_frames")
+@patch("agents.video_agent.detect_pose_from_video")
 async def test_video_agent_succes(
-    mock_extract: MagicMock,
     mock_detect: MagicMock,
     mock_calc: MagicMock,
+    _mock_plan: MagicMock,
+    _mock_extract_specific: MagicMock,
+    _mock_render: MagicMock,
     _mock_exists: MagicMock,
 ) -> None:
-    mock_extract.return_value = _FAKE_FRAMES
     mock_detect.return_value = _make_landmarks(10, 0)
     mock_calc.return_value = BiomechanicalMetrics(
         cadence=172.0,
@@ -113,12 +116,10 @@ async def test_video_agent_succes(
 
 
 @patch("agents.video_agent.os.path.exists", return_value=True)
-@patch("agents.video_agent.detect_pose")
-@patch("agents.video_agent.extract_frames")
+@patch("agents.video_agent.detect_pose_from_video")
 async def test_video_agent_taux_echec_depasse_seuil(
-    mock_extract: MagicMock, mock_detect: MagicMock, _mock_exists: MagicMock
+    mock_detect: MagicMock, _mock_exists: MagicMock
 ) -> None:
-    mock_extract.return_value = _FAKE_FRAMES
     mock_detect.return_value = _make_landmarks(7, 3)  # 30% d'échec
 
     state = ARIAState(
@@ -149,12 +150,17 @@ async def test_video_agent_taux_echec_depasse_seuil(
 
 
 @patch("agents.video_agent.os.path.exists", return_value=True)
-@patch("agents.video_agent.detect_pose")
-@patch("agents.video_agent.extract_frames")
+@patch("agents.video_agent.render_key_frames", return_value=[])
+@patch("agents.video_agent.extract_specific_frames", return_value={})
+@patch("agents.video_agent.plan_key_frames", return_value=[])
+@patch("agents.video_agent.detect_pose_from_video")
 async def test_video_agent_taux_echec_sous_seuil(
-    mock_extract: MagicMock, mock_detect: MagicMock, _mock_exists: MagicMock
+    mock_detect: MagicMock,
+    _mock_plan: MagicMock,
+    _mock_extract_specific: MagicMock,
+    _mock_render: MagicMock,
+    _mock_exists: MagicMock,
 ) -> None:
-    mock_extract.return_value = _FAKE_FRAMES
     mock_detect.return_value = _make_landmarks(8, 2)  # exactement 20%
 
     state = ARIAState(
@@ -195,11 +201,14 @@ async def test_video_agent_taux_echec_sous_seuil(
 
 
 @patch("agents.video_agent.os.path.exists", return_value=True)
-@patch("agents.video_agent.extract_frames", side_effect=OSError("fichier introuvable"))
+@patch(
+    "agents.video_agent.detect_pose_from_video",
+    side_effect=OSError("fichier introuvable"),
+)
 async def test_video_agent_erreur_extraction(
-    mock_extract: MagicMock, _mock_exists: MagicMock
+    mock_detect: MagicMock, _mock_exists: MagicMock
 ) -> None:
-    assert mock_extract.side_effect is not None
+    assert mock_detect.side_effect is not None
 
     state = ARIAState(
         session_id="SES-TEST",

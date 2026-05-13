@@ -42,7 +42,9 @@ def _make_options(model_path: str | None) -> object:
     PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions  # type: ignore[attr-defined]
     RunningMode = mp.tasks.vision.RunningMode  # type: ignore[attr-defined]
     return PoseLandmarkerOptions(
-        base_options=BaseOptions(model_asset_path=model_path or settings.MEDIAPIPE_MODEL_PATH),
+        base_options=BaseOptions(
+            model_asset_path=model_path or settings.MEDIAPIPE_MODEL_PATH
+        ),
         running_mode=RunningMode.VIDEO,
         min_pose_detection_confidence=0.7,
         min_tracking_confidence=0.5,
@@ -56,8 +58,7 @@ def _parse_result(result: object, frame_index: int) -> PoseLandmarks | None:
     return PoseLandmarks(
         frame_index=frame_index,
         landmarks=[
-            Landmark(x=lm.x, y=lm.y, z=lm.z, visibility=lm.visibility)
-            for lm in raw_lms
+            Landmark(x=lm.x, y=lm.y, z=lm.z, visibility=lm.visibility) for lm in raw_lms
         ],
     )
 
@@ -116,7 +117,9 @@ def detect_pose_from_video(
                 ts_ms = int(pose_idx * 1000 / fps)
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-                results.append(_parse_result(landmarker.detect_for_video(mp_img, ts_ms), pose_idx))
+                results.append(
+                    _parse_result(landmarker.detect_for_video(mp_img, ts_ms), pose_idx)
+                )
                 del rgb, mp_img
                 pose_idx += 1
             frame_idx += 1
