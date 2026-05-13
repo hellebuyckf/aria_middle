@@ -221,33 +221,14 @@ def _detect_ic(heel_y: np.ndarray, fps: float) -> np.ndarray:
     return peaks
 
 
-def select_key_frames(
-    frames_sag: list[np.ndarray],
+def plan_key_frames(
     raw_sag: list,
     metrics: BiomechanicalMetrics,
     fps: float,
-) -> list[str]:
-    """Sélectionne et annote jusqu'à 4 frames clés pour le rapport PDF.
+) -> list[tuple[int, str]]:
+    """Retourne le plan d'annotation : liste de (frame_index, metric_name).
 
-    Stratégie de sélection :
-    - Les métriques sont triées : anormales d'abord, puis par ordre de _PRIORITY.
-    - Les métriques à l'IC (flexion genou, attaque pied, valgus, pronation) reçoivent
-      des frames différentes prélevées à 1/4, 1/2 et 3/4 de la séquence d'ICs,
-      pour montrer la variabilité intra-séquence plutôt qu'un seul instant.
-    - Les métriques globales (inclinaison tronc, pelvic drop, oscillation verticale)
-      reçoivent la frame médiane de la séquence valide.
-
-    Args:
-        frames_sag: Frames BGR sagittales (avec visages floutés) issues de extract_frames.
-        raw_sag: Résultats bruts de detect_pose — list[PoseLandmarks | None], un élément
-            par frame dans frames_sag. Les None (échecs MediaPipe) sont ignorés.
-        metrics: Métriques calculées par calculate_metrics / calculate_posterior_metrics.
-        fps: Fréquence d'images utilisée lors de l'extraction (typiquement 25 Hz).
-
-    Returns:
-        Liste de 0 à 4 chaînes base64 PNG prêtes pour intégration dans le template
-        Jinja2 via ``data:image/png;base64,…``.
-        Liste vide si aucune frame valide n'est disponible.
+    Permet d'identifier les frames nécessaires avant de les charger en mémoire.
     """
     valid_poses: list[PoseLandmarks] = [pl for pl in raw_sag if pl is not None]
     if not valid_poses:
@@ -272,23 +253,56 @@ def select_key_frames(
         key=lambda m: (not _is_abnormal(m, metric_vals[m]), _PRIORITY.index(m)),
     )
 
-    result: list[str] = []
+    plan: list[tuple[int, str]] = []
     ic_cursor = 0
     for m in sorted_metrics:
-        if len(result) == 6:
+        if len(plan) == 6:
             break
         if m in _IC_METRICS:
             if ic_pool:
                 valid_idx = ic_pool[ic_cursor % len(ic_pool)]
                 ic_cursor += 1
             elif _is_abnormal(m, metric_vals[m]):
-                valid_idx = median_idx  # fallback : anormal sans IC → frame médiane
+                valid_idx = median_idx
             else:
                 continue
         else:
             valid_idx = median_idx
         pose = valid_poses[valid_idx]
-        frame = frames_sag[pose.frame_index]
-        result.append(_to_b64(annotate_frame(frame, pose.landmarks, m, metric_vals[m])))
+        plan.append((pose.frame_index, m))
+
+    return plan
+
+
+def render_key_frames(
+    frames: dict[int, np.ndarray],
+    plan: list[tuple[int, str]],
+    raw_sag: list,
+    metrics: BiomechanicalMetrics,
+) -> list[str]:
+    """Annote et encode en base64 les frames sélectionnées par plan_key_frames."""
+    valid_poses: list[PoseLandmarks] = [pl for pl in raw_sag if pl is not None]
+    poses_by_frame: dict[int, PoseLandmarks] = {pl.frame_index: pl for pl in valid_poses}
+    metric_vals = {f: getattr(metrics, f, None) for f in _PRIORITY}
+
+    result: list[str] = []
+    for frame_index, m in plan:
+        frame = frames.get(frame_index)
+        pose = poses_by_frame.get(frame_index)
+        if frame is None or pose is None:
+            continue
+        result.append(_to_b64(annotate_frame(frame, pose.landmarks, m, metric_vals.get(m))))
 
     return result
+
+
+def select_key_frames(
+    frames_sag: list[np.ndarray],
+    raw_sag: list,
+    metrics: BiomechanicalMetrics,
+    fps: float,
+) -> list[str]:
+    """Sélectionne et annote jusqu'à 6 frames clés (API legacy — charge toutes les frames)."""
+    plan = plan_key_frames(raw_sag, metrics, fps)
+    frames_dict = {i: frames_sag[i] for i, _ in plan if i < len(frames_sag)}
+    return render_key_frames(frames_dict, plan, raw_sag, metrics)

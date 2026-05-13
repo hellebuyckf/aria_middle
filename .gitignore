@@ -220,3 +220,6 @@ pose_landmarker_full.task
 # Corpus PubMed — abstracts volumineux, régénérés via fetch_pubmed.py
 data/corpus/*.json
 audit1.md
+data/sessions
+data/corpus/chroma.sqlite3
+
