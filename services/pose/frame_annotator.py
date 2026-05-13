@@ -20,6 +20,7 @@ import cv2
 import numpy as np
 from scipy.signal import find_peaks
 
+from core.thresholds import THRESHOLDS as _THRESHOLDS
 from models.metrics import BiomechanicalMetrics
 from services.pose.mediapipe_service import Landmark, PoseLandmarks
 
@@ -30,22 +31,6 @@ _BONE = (160, 130, 80)  # segments squelettiques
 _NORMAL = (60, 180, 60)  # accent si métrique dans la norme
 _ABNORMAL = (50, 50, 220)  # accent si métrique hors norme
 _TEXT_BG = (20, 20, 20)  # fond du bandeau texte
-
-# ── Seuils normatifs (lo, hi) — None = borne ouverte ─────────────────────────
-# Miroir de pdf_service._is_abnormal ; doit rester synchronisé.
-_THRESHOLDS: dict[str, tuple[float | None, float | None]] = {
-    "cadence": (170.0, 180.0),
-    "angle_attaque_pied": (None, 10.0),
-    "flexion_genou_impact": (15.0, 25.0),
-    "inclinaison_tronc": (5.0, 10.0),
-    "oscillation_verticale": (None, 8.0),
-    "ratio_contact_suspension": (0.35, 0.65),
-    "pelvic_drop": (None, 5.0),
-    "valgus_genou": (None, 8.0),
-    "asymetrie_charge": (None, 10.0),
-    "oscillation_laterale_hanche": (None, 3.0),
-    "pronation_pied": (None, 8.0),
-}
 
 # ── Libellés affichés sur les frames (label, unité) ──────────────────────────
 _LABELS: dict[str, tuple[str, str]] = {
@@ -290,13 +275,16 @@ def select_key_frames(
     result: list[str] = []
     ic_cursor = 0
     for m in sorted_metrics:
-        if len(result) == 4:
+        if len(result) == 6:
             break
         if m in _IC_METRICS:
-            if not ic_pool:
+            if ic_pool:
+                valid_idx = ic_pool[ic_cursor % len(ic_pool)]
+                ic_cursor += 1
+            elif _is_abnormal(m, metric_vals[m]):
+                valid_idx = median_idx  # fallback : anormal sans IC → frame médiane
+            else:
                 continue
-            valid_idx = ic_pool[ic_cursor % len(ic_pool)]
-            ic_cursor += 1
         else:
             valid_idx = median_idx
         pose = valid_poses[valid_idx]

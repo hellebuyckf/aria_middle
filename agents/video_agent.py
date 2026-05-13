@@ -7,6 +7,7 @@ from loguru import logger
 
 import core.events as events
 from core.state import ARIAState
+from core.thresholds import compute_abnormal_metrics
 from services.pose.frame_annotator import select_key_frames
 from services.pose.frame_extractor import extract_frames
 from services.pose.mediapipe_service import detect_pose
@@ -217,6 +218,14 @@ async def video_agent(state: ARIAState) -> ARIAState:
                     "message": "Vidéo analysée",
                 },
             )
+
+        await events.emit(
+            session_id,
+            {
+                "type": "metrics_alert",
+                "metriques_anormales": compute_abnormal_metrics(metrics),
+            },
+        )
 
         return {**state, "key_frames": key_frames, "metrics": metrics, "statut": "rag"}
 

@@ -6,27 +6,12 @@ from loguru import logger
 import core.events as events
 from core.pathologies import metriques_pour
 from core.state import ARIAState
+from core.thresholds import compute_abnormal_metrics
 from models.metrics import BiomechanicalMetrics
 from models.report import ARIAReport
 from services.llm import vllm_client as llm
 
 _EXCLUDED_FIELDS = {"vue_posterieure_disponible"}
-
-# Seuils (lo, hi) — None = borne ouverte. Miroir de frame_annotator._THRESHOLDS.
-_THRESHOLDS: dict[str, tuple[float | None, float | None]] = {
-    "cadence": (170.0, 180.0),
-    "angle_attaque_pied": (None, 10.0),
-    "flexion_genou_impact": (15.0, 25.0),
-    "inclinaison_tronc": (5.0, 10.0),
-    "oscillation_verticale": (None, 8.0),
-    "ratio_contact_suspension": (0.35, 0.65),
-    "pelvic_drop": (None, 5.0),
-    "valgus_genou": (None, 8.0),
-    "asymetrie_charge": (None, 10.0),
-    "oscillation_laterale_hanche": (None, 3.0),
-    "pronation_pied": (None, 8.0),
-}
-
 
 # Schema JSON attendu du LLM — sans pathologie/confiance/metriques_anormales
 # qui sont injectés déterministiquement après le parsing.
@@ -45,29 +30,6 @@ _REPORT_LLM_SCHEMA: dict = {
         "avertissement",
     ],
 }
-
-
-def _is_abnormal(field: str, value: float) -> bool:
-    lo, hi = _THRESHOLDS.get(field, (None, None))
-    return (lo is not None and value < lo) or (hi is not None and value > hi)
-
-
-def _compute_abnormal_metrics(
-    metrics: BiomechanicalMetrics,
-    pathologie: str,  # noqa: ARG001
-) -> list[str]:
-    """Retourne tous les champs hors norme (sagittaux + postérieurs).
-
-    Non filtrés par pathologie : aligne le comportement avec le PDF et permet
-    à l'UI d'afficher correctement les points rouges sur toutes les métriques.
-    """
-    data = metrics.model_dump()
-    return [
-        field
-        for field, (lo, hi) in _THRESHOLDS.items()
-        if isinstance(data.get(field), (int, float))
-        and _is_abnormal(field, float(data[field]))
-    ]
 
 
 def _relevant_metrics(
@@ -202,7 +164,7 @@ async def report_agent(state: ARIAState) -> dict:
         # Métriques anormales : calculées déterministiquement depuis les seuils
         metrics = state.get("metrics")
         data["metriques_anormales"] = (
-            _compute_abnormal_metrics(metrics, data["pathologie"]) if metrics else []
+            compute_abnormal_metrics(metrics) if metrics else []
         )
         report = ARIAReport.model_validate(data)
         await events.emit(

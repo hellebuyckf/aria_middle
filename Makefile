@@ -2,13 +2,15 @@
         build-protocols \
         serve debug health test-link test test-video \
         test-diagnosis test-rag test-report test-graph lint format install download-model visualize \
+        blur-video \
         docs docs-serve clean docker-build docker-up docker-down docker-logs docker-debug
 
 MIDDLE_URL ?= http://localhost:8000
 DOCS_DIR   ?= docs
 
-VIDEO  ?= data/sessions/test.mp4
-OUTPUT ?= output_pose.mp4
+VIDEO   ?= data/sessions/test.mp4
+OUTPUT  ?= output_pose.mp4
+BLURRED ?= blurred.mp4
 
 # ────────────────────────────────────────────────────────────────────────────
 help: ## Affiche cette aide
@@ -16,8 +18,9 @@ help: ## Affiche cette aide
 	      /^[a-zA-Z_-]+:.*##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "  Variables surchargeables :"
-	@echo "    VIDEO=<chemin>    vidéo source pour 'visualize'  (défaut : $(VIDEO))"
-	@echo "    OUTPUT=<chemin>   vidéo annotée pour 'visualize' (défaut : $(OUTPUT))"
+	@echo "    VIDEO=<chemin>    vidéo source pour 'visualize' et 'blur-video' (défaut : $(VIDEO))"
+	@echo "    OUTPUT=<chemin>   vidéo annotée pour 'visualize'                (défaut : $(OUTPUT))"
+	@echo "    BLURRED=<chemin>  vidéo floutée pour 'blur-video'               (défaut : $(BLURRED))"
 	@echo ""
 
 # ── Corpus ───────────────────────────────────────────────────────────────────
@@ -106,6 +109,9 @@ download-model: ## Télécharge le modèle MediaPipe PoseLandmarker (racine du p
 # ── Visualisation ────────────────────────────────────────────────────────────
 visualize: ## Génère une vidéo annotée MediaPipe (VIDEO=... OUTPUT=...)
 	uv run python scripts/visualize_pose.py --video $(VIDEO) --output $(OUTPUT)
+
+blur-video: ## Floute les visages d'une vidéo RGPD (VIDEO=... BLURRED=...)
+	uv run python scripts/blur_video.py $(VIDEO) $(BLURRED)
 
 # ── Documentation ────────────────────────────────────────────────────────────
 docs: ## Génère la documentation HTML depuis les docstrings (pdoc → $(DOCS_DIR)/)
