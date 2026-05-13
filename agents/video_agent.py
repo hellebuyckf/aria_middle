@@ -8,9 +8,9 @@ from loguru import logger
 import core.events as events
 from core.state import ARIAState
 from core.thresholds import compute_abnormal_metrics
-from services.pose.frame_annotator import select_key_frames
-from services.pose.frame_extractor import extract_frames
-from services.pose.mediapipe_service import detect_pose
+from services.pose.frame_annotator import plan_key_frames, render_key_frames
+from services.pose.frame_extractor import extract_specific_frames
+from services.pose.mediapipe_service import detect_pose_from_video
 from services.pose.metrics_calculator import (
     calculate_metrics,
     calculate_posterior_metrics,
@@ -41,19 +41,21 @@ def _validate_landmarks(landmarks: list, session_id: str, vue: str) -> list:
 
 async def _run_pose(
     session_id: str,
-    frames: list,
+    video_path: str,
     fps: float,
     pct_start: int,
     pct_end: int,
     estimated_s: float,
 ) -> list:
-    """Exécute detect_pose en executor avec un ticker de progression."""
+    """Exécute detect_pose_from_video en executor avec un ticker de progression."""
     loop = asyncio.get_running_loop()
     ticker = events.tick(
         session_id, "video", pct_start, pct_end, estimated_s, "Analyse de la posture..."
     )
     try:
-        result = await loop.run_in_executor(None, partial(detect_pose, frames, fps))
+        result = await loop.run_in_executor(
+            None, partial(detect_pose_from_video, video_path, int(fps))
+        )
     finally:
         ticker.cancel()
     return result
@@ -78,32 +80,18 @@ async def video_agent(state: ARIAState) -> ARIAState:
     loop = asyncio.get_running_loop()
 
     try:
-        # --- Extraction frames sagittales ---
+        # --- Pass 1 : streaming MediaPipe sagittale (aucune frame stockée) ---
         await events.emit(
             session_id,
             {
                 "type": "progress",
                 "etape": "video",
                 "pct": 5,
-                "message": "Extraction des frames...",
+                "message": "Analyse de la posture (streaming)...",
             },
         )
-        frames_sag = await loop.run_in_executor(
-            None, partial(extract_frames, video_path, 25)
-        )
-        logger.info(f"[{session_id}] {len(frames_sag)} frames sagittales extraites")
-
-        # --- MediaPipe sagittale (étape la plus longue ~15s) ---
-        await events.emit(
-            session_id,
-            {
-                "type": "progress",
-                "etape": "video",
-                "pct": 15,
-                "message": f"{len(frames_sag)} frames — analyse de la posture...",
-            },
-        )
-        raw_sag = await _run_pose(session_id, frames_sag, 25.0, 15, 35, 14.0)
+        raw_sag = await _run_pose(session_id, video_path, 25.0, 5, 35, 14.0)
+        logger.info(f"[{session_id}] {len(raw_sag)} frames sagittales analysées")
         valid_sag = _validate_landmarks(raw_sag, session_id, "sagittale")
 
         # --- Métriques sagittales ---
@@ -134,7 +122,7 @@ async def video_agent(state: ARIAState) -> ARIAState:
             },
         )
 
-        # --- Captures annotées (avant vue postérieure pour libérer frames_sag) ---
+        # --- Pass 2 : extraction ciblée des frames pour annotation ---
         await events.emit(
             session_id,
             {
@@ -144,11 +132,16 @@ async def video_agent(state: ARIAState) -> ARIAState:
                 "message": "Génération des captures clés...",
             },
         )
+        kf_plan = plan_key_frames(raw_sag, metrics, 25.0)
+        needed_indices = {idx for idx, _ in kf_plan}
+        frames_for_annotation = await loop.run_in_executor(
+            None, partial(extract_specific_frames, video_path, needed_indices, 25)
+        )
         key_frames = await loop.run_in_executor(
-            None, partial(select_key_frames, frames_sag, raw_sag, metrics, 25.0)
+            None, partial(render_key_frames, frames_for_annotation, kf_plan, raw_sag, metrics)
         )
         logger.info(f"[{session_id}] {len(key_frames)} capture(s) clé(s) générée(s)")
-        del frames_sag, raw_sag
+        del frames_for_annotation
 
         # --- Vue postérieure (facultative) ---
         if video_path_posterior is not None:
@@ -170,11 +163,8 @@ async def video_agent(state: ARIAState) -> ARIAState:
                             "message": "Analyse vue postérieure...",
                         },
                     )
-                    frames_post = await loop.run_in_executor(
-                        None, partial(extract_frames, video_path_posterior, 25)
-                    )
                     raw_post = await _run_pose(
-                        session_id, frames_post, 25.0, 37, 55, 14.0
+                        session_id, video_path_posterior, 25.0, 37, 55, 14.0
                     )
                     valid_post = _validate_landmarks(
                         raw_post, session_id, "postérieure"

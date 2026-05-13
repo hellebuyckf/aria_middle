@@ -28,6 +28,16 @@ async def _save_upload(upload: UploadFile, dest: Path) -> None:
     dest.write_bytes(content)
 
 
+def _delete_videos(state: ARIAState) -> None:
+    for key in ("video_path", "video_path_posterior"):
+        path_str = state.get(key)
+        if path_str:
+            p = Path(path_str)
+            if p.exists():
+                p.unlink()
+                logger.info("Vidéo supprimée : {}", p)
+
+
 async def _run_pipeline(state: ARIAState) -> None:
     """Lance le pipeline complet : analyse vidéo → diagnostic → RAG → rapport."""
     session_id = state["session_id"]
@@ -77,6 +87,7 @@ async def _run_pipeline(state: ARIAState) -> None:
                 logger.info(
                     "[{}] PDF mis en cache ({} Ko)", session_id, len(pdf_bytes) // 1024
                 )
+                _delete_videos(result)
             except Exception as pdf_exc:
                 logger.warning(
                     "[{}] Mise en cache PDF échouée, key_frames conservées : {}",

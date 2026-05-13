@@ -39,11 +39,63 @@ def _blur_faces(frame: np.ndarray) -> np.ndarray:
     return out if blurred else frame
 
 
+_MAX_WIDTH = 640
+
+
+def _resize(frame: np.ndarray) -> np.ndarray:
+    h, w = frame.shape[:2]
+    if w <= _MAX_WIDTH:
+        return frame
+    scale = _MAX_WIDTH / w
+    return cv2.resize(frame, (_MAX_WIDTH, int(h * scale)), interpolation=cv2.INTER_AREA)
+
+
+def extract_specific_frames(
+    video_path: str,
+    indices: set[int],
+    fps: int = 25,
+) -> dict[int, np.ndarray]:
+    """Extrait uniquement les frames dont l'index (dans la séquence sous-échantillonnée) est dans indices.
+
+    Utilisé après la passe de détection de pose pour récupérer uniquement les frames
+    nécessaires à l'annotation (typiquement ≤ 6), sans charger toute la vidéo.
+    """
+    if not indices:
+        return {}
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError(f"Impossible d'ouvrir la vidéo : {video_path}")
+
+    source_fps: float = cap.get(cv2.CAP_PROP_FPS) or 50.0
+    step = max(1, round(source_fps / fps))
+    frames: dict[int, np.ndarray] = {}
+    frame_idx = 0
+    pose_idx = 0
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        if frame_idx % step == 0:
+            if pose_idx in indices:
+                frame = _resize(frame)
+                frames[pose_idx] = _blur_faces(frame) if settings.BLUR_FACES else frame
+                if len(frames) == len(indices):
+                    break
+            pose_idx += 1
+        frame_idx += 1
+
+    cap.release()
+    return frames
+
+
 def extract_frames(video_path: str, fps: int = 25) -> list[np.ndarray]:
     """Extrait les frames d'une vidéo au fps cible avec floutage visage (RGPD).
 
     Pour une source à 50fps, step=2 → 25fps effectif (1 frame sur 2).
     Les visages sont floutés en mémoire avant tout usage des frames.
+    Les frames sont redimensionnées à max 640px de large pour limiter la RAM.
 
     Args:
         video_path: Chemin vers la vidéo source.
@@ -73,6 +125,7 @@ def extract_frames(video_path: str, fps: int = 25) -> list[np.ndarray]:
         if not ret:
             break
         if frame_idx % step == 0:
+            frame = _resize(frame)
             frames.append(_blur_faces(frame) if settings.BLUR_FACES else frame)
         frame_idx += 1
 
