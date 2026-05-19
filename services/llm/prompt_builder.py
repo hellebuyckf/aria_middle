@@ -94,7 +94,6 @@ def _section_charge_entrainement(
 
 def build_diagnostic_prompt(
     metrics: BiomechanicalMetrics,
-    pathologie_declaree: str | None,
     age: int | None = None,
     taille_cm: int | None = None,
     poids_kg: float | None = None,
@@ -126,22 +125,20 @@ def build_diagnostic_prompt(
         else:
             normales.append(f'- [normal]  "{field}": {value}{unit_str}  [{norm}]')
 
-    lines.append("## MÉTRIQUES")
+    lines.append("## MÉTRIQUES BIOMÉCANIQUES OBJECTIVES")
     lines += anormales + normales
 
     lines += [
         "",
-        "## PATHOLOGIE DÉCLARÉE PAR LE PRATICIEN",
-        pathologie_declaree if pathologie_declaree else "aucune",
-        "",
         "## INSTRUCTION",
-        "Base-toi UNIQUEMENT sur les métriques marquées [ANORMAL] pour identifier la pathologie.",
-        "Identifie la pathologie la plus probable parmi les suivantes :",
+        "En te basant UNIQUEMENT sur les métriques marquées [ANORMAL] ci-dessus,",
+        "identifie la pathologie la plus probable parmi les suivantes :",
         ", ".join(f'"{p}"' for p in NOMS) + ".",
         "",
-        "Réponds UNIQUEMENT en JSON avec les clés suivantes :",
-        '{ "pathologie": "<nom>", "confiance": "élevée|modérée|faible", '
-        '"justification": "<explication courte en référence aux métriques>" }',
+        "Réponds UNIQUEMENT en JSON valide avec exactement ces trois clés :",
+        '{ "pathologie": "<nom exact choisi dans la liste>",',
+        '  "confiance": "<élevée|modérée|faible>",',
+        '  "justification": "<explication en 1-2 phrases citant les métriques anormales>" }',
     ]
 
     return "\n".join(lines)

@@ -161,6 +161,12 @@ async def report_agent(state: ARIAState) -> dict:
         diagnostic = state.get("diagnostic")
         data["pathologie"] = diagnostic.pathologie if diagnostic else "inconnue"
         data["confiance"] = diagnostic.confiance if diagnostic else "faible"
+        logger.info(
+            "[{}] RAPPORT | pathologie={!r} confiance={!r} (source: LLM diagnosis_agent)",
+            session_id,
+            data["pathologie"],
+            data["confiance"],
+        )
         # Métriques anormales : calculées déterministiquement depuis les seuils
         metrics = state.get("metrics")
         data["metriques_anormales"] = (

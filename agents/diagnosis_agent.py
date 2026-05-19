@@ -1,5 +1,7 @@
 import asyncio
 
+from loguru import logger
+
 import core.events as events
 from core.state import ARIAState
 from models.diagnostic import DiagnosticLLM
@@ -9,6 +11,7 @@ from services.llm.vllm_client import generate_diagnostic
 
 async def diagnosis_agent(state: ARIAState) -> dict:
     session_id = state["session_id"]
+    pathologie_declaree = state.get("pathologie_declaree")
     await events.emit(
         session_id,
         {
@@ -29,7 +32,6 @@ async def diagnosis_agent(state: ARIAState) -> dict:
 
     prompt = build_diagnostic_prompt(
         metrics,
-        state["pathologie_declaree"],
         age=state.get("age"),
         taille_cm=state.get("taille_cm"),
         poids_kg=state.get("poids_kg"),
@@ -39,6 +41,15 @@ async def diagnosis_agent(state: ARIAState) -> dict:
         strava_charge=state.get("strava_charge"),
         garmin_charge=state.get("garmin_charge"),
     )
+
+    logger.info(
+        "[{}] DIAGNOSTIC | pathologie_declaree={!r} | prompt_len={} | 'pathologie_declaree' dans le prompt: {}",
+        session_id,
+        pathologie_declaree,
+        len(prompt),
+        repr(pathologie_declaree) in prompt if pathologie_declaree else False,
+    )
+    logger.debug("[{}] PROMPT DIAGNOSTIC:\n{}", session_id, prompt)
 
     try:
         result: DiagnosticLLM = await generate_diagnostic(prompt)
@@ -54,6 +65,13 @@ async def diagnosis_agent(state: ARIAState) -> dict:
             "statut": "erreur",
             "erreur": f"diagnosis_agent: {exc}",
         }
+
+    logger.info(
+        "[{}] DIAGNOSTIC | LLM → pathologie={!r} confiance={!r}",
+        session_id,
+        result.pathologie,
+        result.confiance,
+    )
 
     await events.emit(
         session_id,
