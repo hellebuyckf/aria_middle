@@ -44,7 +44,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _setup_logging()
     logger.info("=" * 60)
     logger.info("ARIA middleware démarré")
-    logger.info("DIAGNOSTIC: pathologie_declaree EXCLUE du prompt LLM (fix anti-biais actif)")
+    logger.info(
+        "DIAGNOSTIC: pathologie_declaree EXCLUE du prompt LLM (fix anti-biais actif)"
+    )
     logger.info("=" * 60)
     try:
         client = chromadb.PersistentClient(path=settings.CHROMADB_PATH)
